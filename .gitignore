@@ -1,0 +1,15 @@
+.anchor
+.DS_Store
+target
+**/*.rs.bk
+node_modules
+test-ledger
+.yarn
+
+# Keypairs — never commit private keys
+*.json
+!tsconfig.json
+!package.json
+!package-lock.json
+!target/idl/*.json
+!target/types/*.json

@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+npx ts-node "$(dirname "$0")/client/cli.ts" "$@"
