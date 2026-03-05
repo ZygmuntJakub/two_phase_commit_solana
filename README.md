@@ -120,16 +120,21 @@ anchor test
 
 ## CPI hooks
 
-Any participant can register a hook program at vote time. When `commit` or `abort` fires, the 2PC program calls each registered program via CPI:
+A participant registers a hook program when casting their vote. When `commit` or `abort` fires, the 2PC program CPIs into every registered hook — in the same Solana transaction:
 
 ```
-commit() → CPI → participant_A::on_2pc_commit(transaction, state)
-         → CPI → participant_B::on_2pc_commit(transaction, state)
+commit()
+  └─ CPI ──► program_A::on_2pc_commit(transaction, state_A)
+  └─ CPI ──► program_B::on_2pc_commit(transaction, state_B)
 ```
 
-All calls happen in a single Solana transaction — atomically. The hook program receives the `Transaction2PC` account and its own state account (passed via `remaining_accounts`).
+This makes the decision and its execution atomic. Neither program updates its state until all votes are in — and when they do, both update in a single slot.
 
-`programs/demo_participant` is a minimal example showing the interface.
+**Concrete example:** two SPL token programs coordinating an atomic swap. Each holds tokens in escrow during PREPARING. On commit, both `on_2pc_commit` handlers release tokens to the counterparty. On abort, both return tokens to the original owner. No trusted intermediary, no sequential settlement risk.
+
+`programs/demo_participant` shows the minimal interface a hook program must implement.
+
+**Tradeoff:** if a hook program panics or returns an error, the entire `commit()` transaction fails. This means participants must trust each other's hook implementations — the same social contract as 2PC itself. A buggy or malicious hook can delay commit, but cannot forge votes or steal funds.
 
 ---
 
@@ -144,6 +149,7 @@ All calls happen in a single Solana transaction — atomically. The hook program
 ./2pc abort <TX>
 ./2pc timeout-abort <TX>
 ./2pc close <TX>
+./2pc watchdog              # auto-abort expired transactions (run as a background process)
 ```
 
 ---

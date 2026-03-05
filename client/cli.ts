@@ -10,8 +10,10 @@ import os from "os";
 import path from "path";
 
 const DEFAULT_KEYPAIR = path.join(os.homedir(), ".config/solana/id.json");
-const DEFAULT_TIMEOUT_SLOTS = 150; // ~60 seconds on devnet
-const PROGRAM_ID = new PublicKey("2PCPgunAXWWUSiKGChz6UQuspAz6Tgqc7mNdWkanGSMM");
+const DEFAULT_TIMEOUT_SLOTS = 150;
+const PROGRAM_ID = new PublicKey(
+  "2PCPgunAXWWUSiKGChz6UQuspAz6Tgqc7mNdWkanGSMM"
+);
 
 function loadKeypair(keyPath: string): Keypair {
   return Keypair.fromSecretKey(
@@ -42,7 +44,11 @@ function setupProgram(keypairPath: string): {
 
 function txPda(coordinator: PublicKey, nonce: BN): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("tx2pc"), coordinator.toBuffer(), nonce.toArrayLike(Buffer, "le", 8)],
+    [
+      Buffer.from("tx2pc"),
+      coordinator.toBuffer(),
+      nonce.toArrayLike(Buffer, "le", 8),
+    ],
     PROGRAM_ID
   );
   return pda;
@@ -73,7 +79,11 @@ cli
   .command("begin <participants...>")
   .description("Start a new 2PC transaction")
   .option("-k, --keypair <path>", "coordinator keypair", DEFAULT_KEYPAIR)
-  .option("-t, --timeout <slots>", "slots before timeout", String(DEFAULT_TIMEOUT_SLOTS))
+  .option(
+    "-t, --timeout <slots>",
+    "slots before timeout",
+    String(DEFAULT_TIMEOUT_SLOTS)
+  )
   .option("-n, --nonce <n>", "custom nonce (default: timestamp)")
   .action(async (participantArgs: string[], opts) => {
     const { program, wallet } = setupProgram(opts.keypair);
@@ -82,7 +92,9 @@ cli
     const txAcc = txPda(wallet.publicKey, nonce);
 
     console.log(`\nCoordinator : ${wallet.publicKey.toBase58()}`);
-    console.log(`Participants: ${participants.map((p) => p.toBase58()).join(", ")}`);
+    console.log(
+      `Participants: ${participants.map((p) => p.toBase58()).join(", ")}`
+    );
     console.log(`Timeout     : ${opts.timeout} slots`);
     console.log(`Nonce       : ${nonce.toString()}`);
     console.log(`TX account  : ${txAcc.toBase58()}`);
@@ -95,7 +107,9 @@ cli
     console.log(`\n✅ Transaction created`);
     console.log(`Signature  : ${sig}`);
     console.log(`TX account : ${txAcc.toBase58()}`);
-    console.log(`Explorer   : https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    console.log(
+      `Explorer   : https://explorer.solana.com/tx/${sig}?cluster=devnet`
+    );
   });
 
 cli
@@ -127,7 +141,9 @@ cli
     console.log(`\n✅ Vote recorded`);
     console.log(`Phase      : ${phaseName(state.phase)}`);
     console.log(`Yes count  : ${state.yesCount}/${state.participantCount}`);
-    console.log(`Explorer   : https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    console.log(
+      `Explorer   : https://explorer.solana.com/tx/${sig}?cluster=devnet`
+    );
   });
 
 cli
@@ -144,7 +160,9 @@ cli
       .rpc();
 
     console.log(`\n✅ COMMITTED`);
-    console.log(`Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    console.log(
+      `Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`
+    );
   });
 
 cli
@@ -161,7 +179,9 @@ cli
       .rpc();
 
     console.log(`\n✅ ABORTED`);
-    console.log(`Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    console.log(
+      `Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`
+    );
   });
 
 cli
@@ -183,7 +203,9 @@ cli
 
     if (!expired) {
       const wait = state.timeoutSlot.toNumber() - currentSlot + 1;
-      console.log(`\nNot expired yet. Wait ~${Math.ceil(wait * 0.4)}s (${wait} slots)`);
+      console.log(
+        `\nNot expired yet. Wait ~${Math.ceil(wait * 0.4)}s (${wait} slots)`
+      );
     }
 
     const sig = await program.methods
@@ -192,7 +214,9 @@ cli
       .rpc();
 
     console.log(`\n✅ ABORTED (timeout)`);
-    console.log(`Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    console.log(
+      `Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`
+    );
   });
 
 cli
@@ -209,7 +233,9 @@ cli
       .rpc();
 
     console.log(`\n✅ Accounts closed, rent reclaimed`);
-    console.log(`Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+    console.log(
+      `Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`
+    );
   });
 
 cli
@@ -230,7 +256,11 @@ cli
     console.log(`  Account     : ${txAcc.toBase58()}`);
     console.log(`  Phase       : ${phaseName(state.phase)}`);
     console.log(`  Coordinator : ${state.coordinator.toBase58()}`);
-    console.log(`  Timeout     : ${state.timeoutSlot.toString()} (${slotsLeft > 0 ? `${slotsLeft} slots left` : "EXPIRED"})`);
+    console.log(
+      `  Timeout     : ${state.timeoutSlot.toString()} (${
+        slotsLeft > 0 ? `${slotsLeft} slots left` : "EXPIRED"
+      })`
+    );
     console.log(`  Yes votes   : ${state.yesCount}/${state.participantCount}`);
     console.log(`${"─".repeat(56)}`);
 
@@ -239,7 +269,48 @@ cli
     }
 
     console.log(`${"─".repeat(56)}`);
-    console.log(`  Explorer: https://explorer.solana.com/address/${txAcc.toBase58()}?cluster=devnet`);
+    console.log(
+      `  Explorer: https://explorer.solana.com/address/${txAcc.toBase58()}?cluster=devnet`
+    );
+  });
+
+cli
+  .command("watchdog")
+  .description("Poll for expired transactions and auto-abort them (permissionless)")
+  .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
+  .option("-i, --interval <seconds>", "poll interval", "10")
+  .action(async (opts) => {
+    const { program } = setupProgram(opts.keypair);
+    const intervalMs = parseInt(opts.interval) * 1000;
+
+    console.log(`\nWatchdog started — polling every ${opts.interval}s`);
+    console.log(`Program : ${PROGRAM_ID.toBase58()}`);
+
+    while (true) {
+      const currentSlot = await program.provider.connection.getSlot();
+      const accounts = await program.account.transaction2Pc.all();
+
+      for (const { publicKey, account } of accounts) {
+        const phase = account.phase;
+        const abortable = "preparing" in phase || "aborting" in phase;
+        const expired = currentSlot > account.timeoutSlot.toNumber();
+
+        if (abortable && expired) {
+          console.log(`\nExpired: ${publicKey.toBase58()} (${phaseName(phase)})`);
+          try {
+            const sig = await program.methods
+              .timeoutAbort()
+              .accounts({ transaction: publicKey })
+              .rpc();
+            console.log(`✅ Aborted — ${sig}`);
+          } catch (e: any) {
+            console.log(`❌ ${e.message}`);
+          }
+        }
+      }
+
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
   });
 
 cli.parseAsync(process.argv).catch((err) => {

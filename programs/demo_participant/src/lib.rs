@@ -12,7 +12,6 @@ pub mod demo_participant {
         Ok(())
     }
 
-    /// Called by the 2PC coordinator via CPI when all participants voted YES and commit() fires.
     pub fn on_2pc_commit(ctx: Context<OnFinalize>) -> Result<()> {
         ctx.accounts.state.finalized = true;
         ctx.accounts.state.committed = true;
@@ -20,7 +19,6 @@ pub mod demo_participant {
         Ok(())
     }
 
-    /// Called by the 2PC coordinator via CPI when any participant voted NO and abort() fires.
     pub fn on_2pc_abort(ctx: Context<OnFinalize>) -> Result<()> {
         ctx.accounts.state.finalized = true;
         ctx.accounts.state.committed = false;

@@ -55,7 +55,8 @@ describe("two_phase_commit", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const program = anchor.workspace.TwoPhaseCommit as Program<TwoPhaseCommit>;
-  const demoProgram = anchor.workspace.DemoParticipant as Program<DemoParticipant>;
+  const demoProgram = anchor.workspace
+    .DemoParticipant as Program<DemoParticipant>;
 
   const coordinator = Keypair.generate();
   const alice = Keypair.generate();
@@ -138,10 +139,7 @@ describe("two_phase_commit", () => {
     let state = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("aborting" in state.phase, "NO vote → Aborting");
 
-    await program.methods
-      .abort()
-      .accounts({ transaction: txAcc })
-      .rpc();
+    await program.methods.abort().accounts({ transaction: txAcc }).rpc();
 
     state = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("aborted" in state.phase, "abort() → Aborted");
@@ -160,10 +158,7 @@ describe("two_phase_commit", () => {
     const state = await program.account.transaction2Pc.fetch(txAcc);
     await waitForSlot(provider.connection, state.timeoutSlot.toNumber());
 
-    await program.methods
-      .timeoutAbort()
-      .accounts({ transaction: txAcc })
-      .rpc();
+    await program.methods.timeoutAbort().accounts({ transaction: txAcc }).rpc();
 
     const final = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("aborted" in final.phase, "expired Preparing → Aborted");
@@ -190,10 +185,7 @@ describe("two_phase_commit", () => {
 
     await waitForSlot(provider.connection, state.timeoutSlot.toNumber());
 
-    await program.methods
-      .timeoutAbort()
-      .accounts({ transaction: txAcc })
-      .rpc();
+    await program.methods.timeoutAbort().accounts({ transaction: txAcc }).rpc();
 
     const final = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("aborted" in final.phase, "expired Aborting → Aborted");
@@ -227,10 +219,7 @@ describe("two_phase_commit", () => {
     // CannotTimeoutCommitting fires before NotYetExpired — no need to wait for expiry
     await expectError(
       () =>
-        program.methods
-          .timeoutAbort()
-          .accounts({ transaction: txAcc })
-          .rpc(),
+        program.methods.timeoutAbort().accounts({ transaction: txAcc }).rpc(),
       "CannotTimeoutCommitting"
     );
   });
@@ -322,7 +311,10 @@ describe("two_phase_commit", () => {
   it("validation: more than 10 participants rejected", async () => {
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
-    const tooMany = Array.from({ length: 11 }, () => Keypair.generate().publicKey);
+    const tooMany = Array.from(
+      { length: 11 },
+      () => Keypair.generate().publicKey
+    );
 
     await expectError(
       () =>
@@ -378,7 +370,9 @@ describe("two_phase_commit", () => {
       .signers([coordinator])
       .rpc();
 
-    const balanceBefore = await provider.connection.getBalance(coordinator.publicKey);
+    const balanceBefore = await provider.connection.getBalance(
+      coordinator.publicKey
+    );
 
     await program.methods
       .closeTransaction()
@@ -386,8 +380,13 @@ describe("two_phase_commit", () => {
       .signers([coordinator])
       .rpc();
 
-    const balanceAfter = await provider.connection.getBalance(coordinator.publicKey);
-    assert.ok(balanceAfter > balanceBefore, "coordinator should receive rent back");
+    const balanceAfter = await provider.connection.getBalance(
+      coordinator.publicKey
+    );
+    assert.ok(
+      balanceAfter > balanceBefore,
+      "coordinator should receive rent back"
+    );
 
     const closed = await provider.connection.getAccountInfo(txAcc);
     assert.equal(closed, null, "transaction account should be closed");
@@ -470,7 +469,6 @@ describe("two_phase_commit", () => {
       .signers([coordinator, bobState])
       .rpc();
 
-    // Begin 2PC transaction
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
 
@@ -480,7 +478,6 @@ describe("two_phase_commit", () => {
       .signers([coordinator])
       .rpc();
 
-    // Both participants vote YES and register their hook program
     await program.methods
       .castVote({ yes: {} }, demoProgram.programId)
       .accounts({ participant: alice.publicKey, transaction: txAcc })
@@ -496,27 +493,29 @@ describe("two_phase_commit", () => {
     const state = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("committing" in state.phase);
 
-    // commit() with remaining_accounts: [program, state] per participant
     await program.methods
       .commit()
       .accounts({ coordinator: coordinator.publicKey, transaction: txAcc })
       .remainingAccounts([
         { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
-        { pubkey: aliceState.publicKey,  isWritable: true,  isSigner: false },
+        { pubkey: aliceState.publicKey, isWritable: true, isSigner: false },
         { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
-        { pubkey: bobState.publicKey,    isWritable: true,  isSigner: false },
+        { pubkey: bobState.publicKey, isWritable: true, isSigner: false },
       ])
       .signers([coordinator])
       .rpc();
 
-    // Verify hooks fired in both participant programs
-    const aliceData = await demoProgram.account.participantState.fetch(aliceState.publicKey);
-    const bobData   = await demoProgram.account.participantState.fetch(bobState.publicKey);
+    const aliceData = await demoProgram.account.participantState.fetch(
+      aliceState.publicKey
+    );
+    const bobData = await demoProgram.account.participantState.fetch(
+      bobState.publicKey
+    );
 
     assert.ok(aliceData.finalized, "alice hook: finalized");
     assert.ok(aliceData.committed, "alice hook: committed=true");
-    assert.ok(bobData.finalized,   "bob hook: finalized");
-    assert.ok(bobData.committed,   "bob hook: committed=true");
+    assert.ok(bobData.finalized, "bob hook: finalized");
+    assert.ok(bobData.committed, "bob hook: committed=true");
   });
 
   it("CPI hooks: on_2pc_abort fires when timeout_abort() called", async () => {
@@ -553,12 +552,14 @@ describe("two_phase_commit", () => {
       .accounts({ transaction: txAcc })
       .remainingAccounts([
         { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
-        { pubkey: aliceState.publicKey,  isWritable: true,  isSigner: false },
+        { pubkey: aliceState.publicKey, isWritable: true, isSigner: false },
       ])
       .rpc();
 
-    const aliceData = await demoProgram.account.participantState.fetch(aliceState.publicKey);
-    assert.ok(aliceData.finalized,  "alice hook: finalized");
+    const aliceData = await demoProgram.account.participantState.fetch(
+      aliceState.publicKey
+    );
+    assert.ok(aliceData.finalized, "alice hook: finalized");
     assert.ok(!aliceData.committed, "alice hook: committed=false");
   });
 
@@ -584,7 +585,6 @@ describe("two_phase_commit", () => {
       .signers([bob])
       .rpc();
 
-    // commit() without passing remaining_accounts → MissingHookAccount
     await expectError(
       () =>
         program.methods
@@ -628,7 +628,6 @@ describe("two_phase_commit", () => {
       .signers([bob])
       .rpc();
 
-    // Alice votes NO — triggers Aborting, also registers hook
     await program.methods
       .castVote({ no: {} }, demoProgram.programId)
       .accounts({ participant: alice.publicKey, transaction: txAcc })
@@ -643,18 +642,22 @@ describe("two_phase_commit", () => {
       .accounts({ transaction: txAcc })
       .remainingAccounts([
         { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
-        { pubkey: aliceState.publicKey,  isWritable: true,  isSigner: false },
+        { pubkey: aliceState.publicKey, isWritable: true, isSigner: false },
         { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
-        { pubkey: bobState.publicKey,    isWritable: true,  isSigner: false },
+        { pubkey: bobState.publicKey, isWritable: true, isSigner: false },
       ])
       .rpc();
 
-    const aliceData = await demoProgram.account.participantState.fetch(aliceState.publicKey);
-    const bobData   = await demoProgram.account.participantState.fetch(bobState.publicKey);
+    const aliceData = await demoProgram.account.participantState.fetch(
+      aliceState.publicKey
+    );
+    const bobData = await demoProgram.account.participantState.fetch(
+      bobState.publicKey
+    );
 
-    assert.ok(aliceData.finalized,  "alice hook: finalized");
+    assert.ok(aliceData.finalized, "alice hook: finalized");
     assert.ok(!aliceData.committed, "alice hook: committed=false");
-    assert.ok(bobData.finalized,    "bob hook: finalized");
-    assert.ok(!bobData.committed,   "bob hook: committed=false");
+    assert.ok(bobData.finalized, "bob hook: finalized");
+    assert.ok(!bobData.committed, "bob hook: committed=false");
   });
 });

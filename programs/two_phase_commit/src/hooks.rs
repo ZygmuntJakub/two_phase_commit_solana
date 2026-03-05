@@ -5,9 +5,7 @@ use anchor_lang::solana_program::{
 };
 use sha2::{Digest, Sha256};
 
-/// Fire CPI callbacks for all participants that registered a hook program.
-///
-/// remaining_accounts layout (in participant order, only for non-None hooks):
+/// remaining_accounts layout (one pair per participant with a hook, in participant order):
 ///   [program_account, state_account, ...]
 pub fn fire_hooks<'info>(
     hooks: &[Option<Pubkey>],

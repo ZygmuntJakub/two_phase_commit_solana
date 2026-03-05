@@ -25,11 +25,11 @@ pub struct Transaction2PC {
     pub version: u8,
     pub coordinator: Pubkey,
     #[compress]
-    pub participants: Vec<u8>,  // LZ4-compressed pubkeys; each pubkey is 32 bytes uncompressed
+    pub participants: Vec<u8>,
     pub participant_count: u8,
     pub phase: Phase,
     pub votes: Vec<Option<Vote>>,
-    pub hooks: Vec<Option<Pubkey>>,  // CPI hook program per participant (None = no hook)
+    pub hooks: Vec<Option<Pubkey>>,
     pub yes_count: u8,
     pub timeout_slot: u64,
     pub nonce: u64,
