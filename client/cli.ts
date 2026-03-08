@@ -11,9 +11,79 @@ import path from "path";
 
 const DEFAULT_KEYPAIR = path.join(os.homedir(), ".config/solana/id.json");
 const DEFAULT_TIMEOUT_SLOTS = 150;
+const DEFAULT_CLUSTER = "localnet";
+const ENV_FILE = path.join(process.cwd(), ".2pc-env");
+
+function readEnv(): Record<string, string> {
+  if (!fs.existsSync(ENV_FILE)) return {};
+  return Object.fromEntries(
+    fs.readFileSync(ENV_FILE, "utf-8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => line.split("=", 2) as [string, string])
+  );
+}
+
+function writeEnv(key: string, value: string) {
+  const env = readEnv();
+  env[key] = value;
+  fs.writeFileSync(ENV_FILE, Object.entries(env).map(([k, v]) => `${k}=${v}`).join("\n") + "\n");
+}
+
+function resolveArg(arg: string | undefined, envKey: string, label: string): string {
+  const value = arg ?? readEnv()[envKey];
+  if (!value) {
+    console.error(`❌ Missing ${label}. Pass it as argument or run the appropriate command first.`);
+    process.exit(1);
+  }
+  return value;
+}
 const PROGRAM_ID = new PublicKey(
   "2PCPgunAXWWUSiKGChz6UQuspAz6Tgqc7mNdWkanGSMM"
 );
+
+function clusterUrl(cluster: string): string {
+  if (cluster === "localnet") return "http://localhost:8899";
+  if (cluster === "mainnet-beta") return clusterApiUrl("mainnet-beta");
+  return clusterApiUrl(cluster as any);
+}
+
+function explorerUrl(sig: string, cluster: string): string {
+  const base = `https://explorer.solana.com/tx/${sig}`;
+  if (cluster === "localnet") return `${base}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`;
+  if (cluster === "devnet") return `${base}?cluster=devnet`;
+  if (cluster === "testnet") return `${base}?cluster=testnet`;
+  return base;
+}
+
+async function buildHookAccounts(
+  program: Program<TwoPhaseCommit>,
+  txAcc: PublicKey
+): Promise<{ pubkey: PublicKey; isWritable: boolean; isSigner: boolean }[]> {
+  const state = await program.account.transaction2Pc.fetch(txAcc);
+  const remaining: { pubkey: PublicKey; isWritable: boolean; isSigner: boolean }[] = [];
+  for (const hook of state.hooks) {
+    if (hook) {
+      const [statePda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("hook_state"), (hook as any).participant.toBuffer()],
+        (hook as any).programId
+      );
+      remaining.push(
+        { pubkey: (hook as any).programId, isWritable: false, isSigner: false },
+        { pubkey: statePda, isWritable: true, isSigner: false }
+      );
+    }
+  }
+  return remaining;
+}
+
+function explorerAddressUrl(address: string, cluster: string): string {
+  const base = `https://explorer.solana.com/address/${address}`;
+  if (cluster === "localnet") return `${base}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`;
+  if (cluster === "devnet") return `${base}?cluster=devnet`;
+  if (cluster === "testnet") return `${base}?cluster=testnet`;
+  return base;
+}
 
 function loadKeypair(keyPath: string): Keypair {
   return Keypair.fromSecretKey(
@@ -21,12 +91,12 @@ function loadKeypair(keyPath: string): Keypair {
   );
 }
 
-function setupProgram(keypairPath: string): {
+function setupProgram(keypairPath: string, cluster: string): {
   program: Program<TwoPhaseCommit>;
   wallet: Keypair;
 } {
   const wallet = loadKeypair(keypairPath);
-  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+  const connection = new Connection(clusterUrl(cluster), "confirmed");
   const provider = new anchor.AnchorProvider(
     connection,
     new anchor.Wallet(wallet),
@@ -72,29 +142,26 @@ function voteName(vote: any): string {
 
 const cli = new Command()
   .name("2pc")
-  .description("Two-Phase Commit CLI — Solana Devnet")
-  .version("1.0.0");
+  .description("Two-Phase Commit CLI")
+  .version("1.0.0")
+  .option("-c, --cluster <name>", "localnet | devnet | testnet | mainnet-beta", DEFAULT_CLUSTER);
 
 cli
   .command("begin <participants...>")
   .description("Start a new 2PC transaction")
   .option("-k, --keypair <path>", "coordinator keypair", DEFAULT_KEYPAIR)
-  .option(
-    "-t, --timeout <slots>",
-    "slots before timeout",
-    String(DEFAULT_TIMEOUT_SLOTS)
-  )
+  .option("-t, --timeout <slots>", "slots before timeout", String(DEFAULT_TIMEOUT_SLOTS))
   .option("-n, --nonce <n>", "custom nonce (default: timestamp)")
   .action(async (participantArgs: string[], opts) => {
-    const { program, wallet } = setupProgram(opts.keypair);
+    const cluster = cli.opts().cluster;
+    const { program, wallet } = setupProgram(opts.keypair, cluster);
     const participants = participantArgs.map((p) => new PublicKey(p));
     const nonce = new BN(opts.nonce ?? Date.now());
     const txAcc = txPda(wallet.publicKey, nonce);
 
-    console.log(`\nCoordinator : ${wallet.publicKey.toBase58()}`);
-    console.log(
-      `Participants: ${participants.map((p) => p.toBase58()).join(", ")}`
-    );
+    console.log(`\nCluster     : ${cluster}`);
+    console.log(`Coordinator : ${wallet.publicKey.toBase58()}`);
+    console.log(`Participants: ${participants.map((p) => p.toBase58()).join(", ")}`);
     console.log(`Timeout     : ${opts.timeout} slots`);
     console.log(`Nonce       : ${nonce.toString()}`);
     console.log(`TX account  : ${txAcc.toBase58()}`);
@@ -104,28 +171,30 @@ cli
       .accounts({ coordinator: wallet.publicKey, transaction: txAcc } as any)
       .rpc();
 
+    writeEnv("TX", txAcc.toBase58());
     console.log(`\n✅ Transaction created`);
     console.log(`Signature  : ${sig}`);
     console.log(`TX account : ${txAcc.toBase58()}`);
-    console.log(
-      `Explorer   : https://explorer.solana.com/tx/${sig}?cluster=devnet`
-    );
+    console.log(`Explorer   : ${explorerUrl(sig, cluster)}`);
+    console.log(`\n💾 Saved to .2pc-env`);
   });
 
 cli
-  .command("vote <tx> <choice>")
-  .description("Cast a vote (yes or no)")
+  .command("vote <choice> [tx]")
+  .description("Cast a vote (yes or no) — tx defaults to TX in .2pc-env")
   .option("-k, --keypair <path>", "participant keypair", DEFAULT_KEYPAIR)
   .option("-H, --hook <program_id>", "CPI hook program to call on finalization")
-  .action(async (txPubkey: string, choice: string, opts) => {
+  .action(async (choice: string, txArg: string | undefined, opts) => {
     if (choice !== "yes" && choice !== "no") {
       console.error("Choice must be 'yes' or 'no'");
       process.exit(1);
     }
-    const { program, wallet } = setupProgram(opts.keypair);
-    const txAcc = new PublicKey(txPubkey);
+    const cluster = cli.opts().cluster;
+    const { program, wallet } = setupProgram(opts.keypair, cluster);
+    const txAcc = new PublicKey(resolveArg(txArg, "TX", "transaction account"));
     const vote = choice === "yes" ? { yes: {} } : { no: {} };
-    const hookProgram = opts.hook ? new PublicKey(opts.hook) : null;
+    const hookAddr = opts.hook ?? readEnv()["HOOK"];
+    const hookProgram = hookAddr ? new PublicKey(hookAddr) : null;
 
     console.log(`\nParticipant : ${wallet.publicKey.toBase58()}`);
     console.log(`TX account  : ${txAcc.toBase58()}`);
@@ -141,56 +210,57 @@ cli
     console.log(`\n✅ Vote recorded`);
     console.log(`Phase      : ${phaseName(state.phase)}`);
     console.log(`Yes count  : ${state.yesCount}/${state.participantCount}`);
-    console.log(
-      `Explorer   : https://explorer.solana.com/tx/${sig}?cluster=devnet`
-    );
+    console.log(`Explorer   : ${explorerUrl(sig, cluster)}`);
   });
 
 cli
-  .command("commit <tx>")
-  .description("Finalize commit (coordinator only)")
+  .command("commit [tx]")
+  .description("Finalize commit (coordinator only) — tx defaults to TX in .2pc-env")
   .option("-k, --keypair <path>", "coordinator keypair", DEFAULT_KEYPAIR)
-  .action(async (txPubkey: string, opts) => {
-    const { program, wallet } = setupProgram(opts.keypair);
-    const txAcc = new PublicKey(txPubkey);
+  .action(async (txArg: string | undefined, opts) => {
+    const cluster = cli.opts().cluster;
+    const { program, wallet } = setupProgram(opts.keypair, cluster);
+    const txAcc = new PublicKey(resolveArg(txArg, "TX", "transaction account"));
 
+    const remainingAccounts = await buildHookAccounts(program, txAcc);
     const sig = await program.methods
       .commit()
       .accounts({ coordinator: wallet.publicKey, transaction: txAcc } as any)
+      .remainingAccounts(remainingAccounts)
       .rpc();
 
     console.log(`\n✅ COMMITTED`);
-    console.log(
-      `Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`
-    );
+    console.log(`Explorer : ${explorerUrl(sig, cluster)}`);
   });
 
 cli
-  .command("abort <tx>")
-  .description("Finalize abort (permissionless)")
+  .command("abort [tx]")
+  .description("Finalize abort (permissionless) — tx defaults to TX in .2pc-env")
   .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
-  .action(async (txPubkey: string, opts) => {
-    const { program } = setupProgram(opts.keypair);
-    const txAcc = new PublicKey(txPubkey);
+  .action(async (txArg: string | undefined, opts) => {
+    const cluster = cli.opts().cluster;
+    const { program } = setupProgram(opts.keypair, cluster);
+    const txAcc = new PublicKey(resolveArg(txArg, "TX", "transaction account"));
 
+    const remainingAccounts = await buildHookAccounts(program, txAcc);
     const sig = await program.methods
       .abort()
       .accounts({ transaction: txAcc })
+      .remainingAccounts(remainingAccounts)
       .rpc();
 
     console.log(`\n✅ ABORTED`);
-    console.log(
-      `Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`
-    );
+    console.log(`Explorer : ${explorerUrl(sig, cluster)}`);
   });
 
 cli
-  .command("timeout-abort <tx>")
-  .description("Abort an expired transaction (permissionless)")
+  .command("timeout-abort [tx]")
+  .description("Abort an expired transaction (permissionless) — tx defaults to TX in .2pc-env")
   .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
-  .action(async (txPubkey: string, opts) => {
-    const { program } = setupProgram(opts.keypair);
-    const txAcc = new PublicKey(txPubkey);
+  .action(async (txArg: string | undefined, opts) => {
+    const cluster = cli.opts().cluster;
+    const { program } = setupProgram(opts.keypair, cluster);
+    const txAcc = new PublicKey(resolveArg(txArg, "TX", "transaction account"));
 
     const state = await program.account.transaction2Pc.fetch(txAcc);
     const currentSlot = await program.provider.connection.getSlot();
@@ -203,29 +273,28 @@ cli
 
     if (!expired) {
       const wait = state.timeoutSlot.toNumber() - currentSlot + 1;
-      console.log(
-        `\nNot expired yet. Wait ~${Math.ceil(wait * 0.4)}s (${wait} slots)`
-      );
+      console.log(`\nNot expired yet. Wait ~${Math.ceil(wait * 0.4)}s (${wait} slots)`);
     }
 
+    const remainingAccounts = await buildHookAccounts(program, txAcc);
     const sig = await program.methods
       .timeoutAbort()
       .accounts({ transaction: txAcc })
+      .remainingAccounts(remainingAccounts)
       .rpc();
 
     console.log(`\n✅ ABORTED (timeout)`);
-    console.log(
-      `Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`
-    );
+    console.log(`Explorer : ${explorerUrl(sig, cluster)}`);
   });
 
 cli
-  .command("close <tx>")
-  .description("Close accounts and reclaim rent (coordinator only)")
+  .command("close [tx]")
+  .description("Close accounts and reclaim rent (coordinator only) — tx defaults to TX in .2pc-env")
   .option("-k, --keypair <path>", "coordinator keypair", DEFAULT_KEYPAIR)
-  .action(async (txPubkey: string, opts) => {
-    const { program, wallet } = setupProgram(opts.keypair);
-    const txAcc = new PublicKey(txPubkey);
+  .action(async (txArg: string | undefined, opts) => {
+    const cluster = cli.opts().cluster;
+    const { program, wallet } = setupProgram(opts.keypair, cluster);
+    const txAcc = new PublicKey(resolveArg(txArg, "TX", "transaction account"));
 
     const sig = await program.methods
       .closeTransaction()
@@ -233,18 +302,17 @@ cli
       .rpc();
 
     console.log(`\n✅ Accounts closed, rent reclaimed`);
-    console.log(
-      `Explorer : https://explorer.solana.com/tx/${sig}?cluster=devnet`
-    );
+    console.log(`Explorer : ${explorerUrl(sig, cluster)}`);
   });
 
 cli
-  .command("status <tx>")
-  .description("Show current transaction state")
+  .command("status [tx]")
+  .description("Show current transaction state — tx defaults to TX in .2pc-env")
   .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
-  .action(async (txPubkey: string, opts) => {
-    const { program } = setupProgram(opts.keypair);
-    const txAcc = new PublicKey(txPubkey);
+  .action(async (txArg: string | undefined, opts) => {
+    const cluster = cli.opts().cluster;
+    const { program } = setupProgram(opts.keypair, cluster);
+    const txAcc = new PublicKey(resolveArg(txArg, "TX", "transaction account"));
 
     const state = await program.account.transaction2Pc.fetch(txAcc);
     const currentSlot = await program.provider.connection.getSlot();
@@ -256,11 +324,7 @@ cli
     console.log(`  Account     : ${txAcc.toBase58()}`);
     console.log(`  Phase       : ${phaseName(state.phase)}`);
     console.log(`  Coordinator : ${state.coordinator.toBase58()}`);
-    console.log(
-      `  Timeout     : ${state.timeoutSlot.toString()} (${
-        slotsLeft > 0 ? `${slotsLeft} slots left` : "EXPIRED"
-      })`
-    );
+    console.log(`  Timeout     : ${state.timeoutSlot.toString()} (${slotsLeft > 0 ? `${slotsLeft} slots left` : "EXPIRED"})`);
     console.log(`  Yes votes   : ${state.yesCount}/${state.participantCount}`);
     console.log(`${"─".repeat(56)}`);
 
@@ -269,49 +333,9 @@ cli
     }
 
     console.log(`${"─".repeat(56)}`);
-    console.log(
-      `  Explorer: https://explorer.solana.com/address/${txAcc.toBase58()}?cluster=devnet`
-    );
+    console.log(`  Explorer: ${explorerAddressUrl(txAcc.toBase58(), cluster)}`);
   });
 
-cli
-  .command("watchdog")
-  .description("Poll for expired transactions and auto-abort them (permissionless)")
-  .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
-  .option("-i, --interval <seconds>", "poll interval", "10")
-  .action(async (opts) => {
-    const { program } = setupProgram(opts.keypair);
-    const intervalMs = parseInt(opts.interval) * 1000;
-
-    console.log(`\nWatchdog started — polling every ${opts.interval}s`);
-    console.log(`Program : ${PROGRAM_ID.toBase58()}`);
-
-    while (true) {
-      const currentSlot = await program.provider.connection.getSlot();
-      const accounts = await program.account.transaction2Pc.all();
-
-      for (const { publicKey, account } of accounts) {
-        const phase = account.phase;
-        const abortable = "preparing" in phase || "aborting" in phase;
-        const expired = currentSlot > account.timeoutSlot.toNumber();
-
-        if (abortable && expired) {
-          console.log(`\nExpired: ${publicKey.toBase58()} (${phaseName(phase)})`);
-          try {
-            const sig = await program.methods
-              .timeoutAbort()
-              .accounts({ transaction: publicKey })
-              .rpc();
-            console.log(`✅ Aborted — ${sig}`);
-          } catch (e: any) {
-            console.log(`❌ ${e.message}`);
-          }
-        }
-      }
-
-      await new Promise((r) => setTimeout(r, intervalMs));
-    }
-  });
 
 cli.parseAsync(process.argv).catch((err) => {
   console.error("\n❌", err.message ?? err);

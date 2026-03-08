@@ -30,7 +30,7 @@ pub fn cast_vote(ctx: Context<CastVote>, vote: Vote, hook_program: Option<Pubkey
     require!(tx.votes[idx].is_none(), ErrorCode::AlreadyVoted);
 
     tx.votes[idx] = Some(vote);
-    tx.hooks[idx] = hook_program;
+    tx.hooks[idx] = hook_program.map(|program_id| HookEntry { program_id, participant: participant_key });
 
     match vote {
         Vote::Yes => {

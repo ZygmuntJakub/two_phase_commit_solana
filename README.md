@@ -152,6 +152,16 @@ This makes the decision and its execution atomic. Neither program updates its st
 ./2pc watchdog              # auto-abort expired transactions (run as a background process)
 ```
 
+## Demo
+
+### Happy path
+
+1. Begin transaction
+```bash
+./2pc begin $(solana-keygen pubkey alice.json) $(solana-keygen pubkey bob.json) --timeout 150
+```
+> [Explorer Link](https://explorer.solana.com/tx/2cz6mvRYBWsehfNDxCPfD8cvqwMQmoA425JUrhqUxTika8MjRSqVJD1d9Y5vwnH4bfjhpktmiPemFz4LrYk4gHBb?cluster=devnet)
+
 ---
 
 ## References

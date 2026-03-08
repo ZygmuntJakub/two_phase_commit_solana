@@ -3,6 +3,12 @@ use densol::{Compress, Lz4 as Strategy};
 
 pub const MAX_PARTICIPANTS: usize = 10;
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+pub struct HookEntry {
+    pub program_id: Pubkey,
+    pub participant: Pubkey,
+}
+
 // Space breakdown:
 // discriminator:          8
 // version:                1
@@ -11,13 +17,13 @@ pub const MAX_PARTICIPANTS: usize = 10;
 // participant_count:      1
 // phase:                  1
 // votes Vec:        4 + 20  (10 × Option<Vote> = 2 bytes each)
-// hooks Vec:       4 + 330  (10 × Option<Pubkey> = 33 bytes each)
+// hooks Vec:       4 + 650  (10 × Option<HookEntry> = 1 + 64 bytes each)
 // yes_count:              1
 // timeout_slot:           8
 // nonce:                  8
 // bump:                   1
-// TOTAL:                743  → 768 with padding
-pub const TRANSACTION_2PC_SIZE: usize = 8 + 768;
+// TOTAL:               1063  → 1088 with padding
+pub const TRANSACTION_2PC_SIZE: usize = 8 + 1088;
 
 #[account]
 #[derive(Compress)]
@@ -29,7 +35,7 @@ pub struct Transaction2PC {
     pub participant_count: u8,
     pub phase: Phase,
     pub votes: Vec<Option<Vote>>,
-    pub hooks: Vec<Option<Pubkey>>,
+    pub hooks: Vec<Option<HookEntry>>,
     pub yes_count: u8,
     pub timeout_slot: u64,
     pub nonce: u64,

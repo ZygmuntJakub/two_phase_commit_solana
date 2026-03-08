@@ -4,11 +4,13 @@ use anchor_lang::solana_program::{
     program::invoke,
 };
 use sha2::{Digest, Sha256};
+use crate::state::HookEntry;
 
 /// remaining_accounts layout (one pair per participant with a hook, in participant order):
 ///   [program_account, state_account, ...]
+/// state_account must be the PDA: ["hook_state", participant] under hook program
 pub fn fire_hooks<'info>(
-    hooks: &[Option<Pubkey>],
+    hooks: &[Option<HookEntry>],
     instruction_name: &str,
     tx_key: Pubkey,
     tx_info: &AccountInfo<'info>,
@@ -17,7 +19,7 @@ pub fn fire_hooks<'info>(
     let discriminator = ix_discriminator(instruction_name);
     let mut iter = remaining_accounts.iter();
 
-    for program_id in hooks.iter().flatten() {
+    for entry in hooks.iter().flatten() {
         let program_info = iter
             .next()
             .ok_or(error!(crate::error::ErrorCode::MissingHookAccount))?;
@@ -25,13 +27,16 @@ pub fn fire_hooks<'info>(
             .next()
             .ok_or(error!(crate::error::ErrorCode::MissingHookAccount))?;
 
+        let mut data = discriminator.to_vec();
+        data.extend_from_slice(entry.participant.as_ref());
+
         let ix = Instruction {
-            program_id: *program_id,
+            program_id: entry.program_id,
             accounts: vec![
                 AccountMeta::new_readonly(tx_key, false),
                 AccountMeta::new(*state_info.key, false),
             ],
-            data: discriminator.to_vec(),
+            data,
         };
 
         invoke(
