@@ -5,6 +5,7 @@ target
 node_modules
 test-ledger
 .yarn
+.2pc-env
 
 # Keypairs — never commit private keys
 *.json

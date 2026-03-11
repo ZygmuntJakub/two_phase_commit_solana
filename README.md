@@ -156,12 +156,210 @@ This makes the decision and its execution atomic. Neither program updates its st
 
 ### Happy path
 
-1. Begin transaction
 ```bash
-./2pc begin $(solana-keygen pubkey alice.json) $(solana-keygen pubkey bob.json) --timeout 150
-```
-> [Explorer Link](https://explorer.solana.com/tx/2cz6mvRYBWsehfNDxCPfD8cvqwMQmoA425JUrhqUxTika8MjRSqVJD1d9Y5vwnH4bfjhpktmiPemFz4LrYk4gHBb?cluster=devnet)
+2pc> ./2pc -c devnet init-hook $(solana-keygen pubkey alice.json) $HOOK_PROGRAM                                                                                                                                 130 ↵
 
+Participant : TMeKk4T8Xx7m8u8tUm2Tq6kUteEG9o4cJ5sQDAuSxPy
+Hook program: 7tQZaZaLooXGEXgpDfDakxMS69j4t8KsrqeGZYeLLbCn
+State PDA   : 53NdBp8PDFvGtfkJvE8WUzaBrp6gbAvFeYJetU2KwUBS
+
+✅ Hook state initialized
+Explorer : https://explorer.solana.com/tx/2YxNSbzoeeVqQjFkc3GWPEr6EcKVxdUiTM2c8MWeYbm5RqmF9yXNTa8ENQ32BzYWqQcfnB6MGdXECv488jsyETaR?cluster=devnet
+
+💾 Saved HOOK to .2pc-env
+2pc> ./2pc -c devnet init-hook $(solana-keygen pubkey bob.json) $HOOK_PROGRAM
+
+Participant : 2xzjqGZSQWbVk8937nG1sDvc7inQTswgQ9qbwAAw6WFh
+Hook program: 7tQZaZaLooXGEXgpDfDakxMS69j4t8KsrqeGZYeLLbCn
+State PDA   : 7UicipRr2dDkDiRwiTckFZZ3omzNpat3NBzmKgYgcVgd
+
+✅ Hook state initialized
+Explorer : https://explorer.solana.com/tx/2KaTc7eDBdHkv6pcrwmyrk2FL7Wk3F8MdhETcQhSQnNpSdryTRaLcnmKNm3TdcrozQ7hg8phYQTgXKdHSKH8sMDy?cluster=devnet
+
+💾 Saved HOOK to .2pc-env
+2pc> ./2pc -c devnet begin $(solana-keygen pubkey alice.json) $(solana-keygen pubkey bob.json) --timeout 500000
+
+Cluster     : devnet
+Coordinator : 5HbsftX6dPm64URQoJy88fJnjK4p15w3TxeAaHEsRmi5
+Participants: TMeKk4T8Xx7m8u8tUm2Tq6kUteEG9o4cJ5sQDAuSxPy, 2xzjqGZSQWbVk8937nG1sDvc7inQTswgQ9qbwAAw6WFh
+Timeout     : 500000 slots
+Nonce       : 1773584325534
+TX account  : 3VC4NviGgzA1maAzQLgr5gaUxUsc67irFtbhZGW5H9gq
+
+✅ Transaction created
+Signature  : 5XJXLZEGMSGoakmrJH9Fh5nkusCPJspCeL6rH5eXDdvKpTnsBsVDoGu1RUdR9gnbUyZ5xrYCa3KNbfWGaK9q1bhn
+TX account : 3VC4NviGgzA1maAzQLgr5gaUxUsc67irFtbhZGW5H9gq
+Explorer   : https://explorer.solana.com/tx/5XJXLZEGMSGoakmrJH9Fh5nkusCPJspCeL6rH5eXDdvKpTnsBsVDoGu1RUdR9gnbUyZ5xrYCa3KNbfWGaK9q1bhn?cluster=devnet
+
+💾 Saved to .2pc-env
+2pc> ./2pc -c devnet vote yes --keypair alice.json
+
+Participant : TMeKk4T8Xx7m8u8tUm2Tq6kUteEG9o4cJ5sQDAuSxPy
+TX account  : 3VC4NviGgzA1maAzQLgr5gaUxUsc67irFtbhZGW5H9gq
+Vote        : YES
+Hook        : 7tQZaZaLooXGEXgpDfDakxMS69j4t8KsrqeGZYeLLbCn
+
+✅ Vote recorded
+Phase      : PREPARING
+Yes count  : 1/2
+Explorer   : https://explorer.solana.com/tx/VfZd6Q5EQukCBpuV5JedQvKKPt3owAoz2cycNPsJrapomFk7XQb24NkkkPARPTwTTatYTLZEPAaMaBfMzkZ3ibW?cluster=devnet
+2pc> ./2pc -c devnet vote yes --keypair bob.json
+
+Participant : 2xzjqGZSQWbVk8937nG1sDvc7inQTswgQ9qbwAAw6WFh
+TX account  : 3VC4NviGgzA1maAzQLgr5gaUxUsc67irFtbhZGW5H9gq
+Vote        : YES
+Hook        : 7tQZaZaLooXGEXgpDfDakxMS69j4t8KsrqeGZYeLLbCn
+
+✅ Vote recorded
+Phase      : COMMITTING
+Yes count  : 2/2
+Explorer   : https://explorer.solana.com/tx/42mAo83EGYLFpwfk2d1Jd8JBoAkiynKt3SZgnMNWKp4dB949V6wLNmd4JqdL8TAHwm4Vp3Kn3PRiXxjzTtRFeCPN?cluster=devnet
+2pc> ./2pc -c devnet commit
+
+✅ COMMITTED
+Explorer : https://explorer.solana.com/tx/pPwK78vcbmVTS6ZSnFFJo8iu3LDJZZpE2rZHkNdVADK3JiVUSM3BDVX6XgLyXcV9kvG1UQNhSpNSz3zJcbfv79s?cluster=devnet
+2pc> ./2pc -c devnet status
+
+────────────────────────────────────────────────────────
+  2PC Transaction Status
+────────────────────────────────────────────────────────
+  Account     : 3VC4NviGgzA1maAzQLgr5gaUxUsc67irFtbhZGW5H9gq
+  Phase       : COMMITTED ✅
+  Coordinator : 5HbsftX6dPm64URQoJy88fJnjK4p15w3TxeAaHEsRmi5
+  Timeout     : 449165187 (499870 slots left)
+  Yes votes   : 2/2
+────────────────────────────────────────────────────────
+  [1] YES ✅
+  [2] YES ✅
+────────────────────────────────────────────────────────
+  Explorer: https://explorer.solana.com/address/3VC4NviGgzA1maAzQLgr5gaUxUsc67irFtbhZGW5H9gq?cluster=devnet
+2pc> ./2pc -c devnet hook-status $(solana-keygen pubkey alice.json)
+
+Participant : TMeKk4T8Xx7m8u8tUm2Tq6kUteEG9o4cJ5sQDAuSxPy
+State PDA   : 53NdBp8PDFvGtfkJvE8WUzaBrp6gbAvFeYJetU2KwUBS
+Finalized   : true
+Committed   : true
+2pc> ./2pc -c devnet hook-status $(solana-keygen pubkey bob.json)
+
+Participant : 2xzjqGZSQWbVk8937nG1sDvc7inQTswgQ9qbwAAw6WFh
+State PDA   : 7UicipRr2dDkDiRwiTckFZZ3omzNpat3NBzmKgYgcVgd
+Finalized   : true
+Committed   : true
+2pc> ./2pc -c devnet close
+
+✅ Accounts closed, rent reclaimed
+Explorer : https://explorer.solana.com/tx/XXC42SRhHHbK61ZwEGKJaZmuKNnuwTUFzVEyv7Djbg5YEhUA6zbcvgw3oCH6SCJJXN4oKyADEAmi4S87XHSEyh8?cluster=devnet
+```
+
+### Abort path
+
+```bash
+2pc> ./2pc -c devnet begin $(solana-keygen pubkey alice.json) $(solana-keygen pubkey bob.json) --timeout 500000                                                                                                 130 ↵
+
+Cluster     : devnet
+Coordinator : 5HbsftX6dPm64URQoJy88fJnjK4p15w3TxeAaHEsRmi5
+Participants: TMeKk4T8Xx7m8u8tUm2Tq6kUteEG9o4cJ5sQDAuSxPy, 2xzjqGZSQWbVk8937nG1sDvc7inQTswgQ9qbwAAw6WFh
+Timeout     : 500000 slots
+Nonce       : 1773584472475
+TX account  : 97BYa7WKgr4V8xs4Xx2VUwpz4rdwxVP2hcvRL7Jp8XpK
+
+✅ Transaction created
+Signature  : 5mpBmevfFdjcLiPhhXP96m1zH1Kg8dpwUbkLhjBc1yXigwtWmvWUFJzRhozDheibxMm5Ev8xns1NYzpEfNcQRkp6
+TX account : 97BYa7WKgr4V8xs4Xx2VUwpz4rdwxVP2hcvRL7Jp8XpK
+Explorer   : https://explorer.solana.com/tx/5mpBmevfFdjcLiPhhXP96m1zH1Kg8dpwUbkLhjBc1yXigwtWmvWUFJzRhozDheibxMm5Ev8xns1NYzpEfNcQRkp6?cluster=devnet
+
+💾 Saved to .2pc-env
+2pc> ./2pc -c devnet vote yes --keypair alice.json
+
+Participant : TMeKk4T8Xx7m8u8tUm2Tq6kUteEG9o4cJ5sQDAuSxPy
+TX account  : 97BYa7WKgr4V8xs4Xx2VUwpz4rdwxVP2hcvRL7Jp8XpK
+Vote        : YES
+Hook        : 7tQZaZaLooXGEXgpDfDakxMS69j4t8KsrqeGZYeLLbCn
+
+✅ Vote recorded
+Phase      : PREPARING
+Yes count  : 1/2
+Explorer   : https://explorer.solana.com/tx/2DSiJJprCZyMARgdufpFJUVtZaCBFhsbkPQNxr6Ketzayre1pPPzXNQsFb5rxgPiBdsSV5398kkK1Ly8jQq9ePyt?cluster=devnet
+2pc> ./2pc -c devnet vote no --keypair bob.json
+
+Participant : 2xzjqGZSQWbVk8937nG1sDvc7inQTswgQ9qbwAAw6WFh
+TX account  : 97BYa7WKgr4V8xs4Xx2VUwpz4rdwxVP2hcvRL7Jp8XpK
+Vote        : NO
+Hook        : 7tQZaZaLooXGEXgpDfDakxMS69j4t8KsrqeGZYeLLbCn
+
+✅ Vote recorded
+Phase      : ABORTING
+Yes count  : 1/2
+Explorer   : https://explorer.solana.com/tx/329YYVFh3DKNNfigDz5QgZ6FmMT82M6mmckyuYhj2a2tbGR7tPCE4VrBqucQAW1oTsrSV3PqsVvc9Nz4yZfTkQMd?cluster=devnet
+2pc> ./2pc -c devnet abort
+
+✅ ABORTED
+Explorer : https://explorer.solana.com/tx/5SkcjFfPMb5F8wD5jwAbDySBJsQswGBdzXK1P9aNdCF99ZMrhWYbA5QjMe3WTSpFtR5RKYKfAR8e54fvSYpwrXPt?cluster=devnet
+2pc> ./2pc -c devnet hook-status $(solana-keygen pubkey alice.json)
+
+Participant : TMeKk4T8Xx7m8u8tUm2Tq6kUteEG9o4cJ5sQDAuSxPy
+State PDA   : 53NdBp8PDFvGtfkJvE8WUzaBrp6gbAvFeYJetU2KwUBS
+Finalized   : true
+Committed   : false
+2pc> ./2pc -c devnet hook-status $(solana-keygen pubkey bob.json)
+
+Participant : 2xzjqGZSQWbVk8937nG1sDvc7inQTswgQ9qbwAAw6WFh
+State PDA   : 7UicipRr2dDkDiRwiTckFZZ3omzNpat3NBzmKgYgcVgd
+Finalized   : true
+Committed   : false
+2pc> ./2pc -c devnet close
+
+✅ Accounts closed, rent reclaimed
+Explorer : https://explorer.solana.com/tx/4TBTe2DWhy4UepB1p8rSZhFdTGqfujfR9v66g8jHWQYXnV91QhdWSrxVLUjuEgVBNP8ouATZzvNRc7DZtz6NsHDH?cluster=devnet
+```
+
+### Timeout Path
+
+```bash
+2pc> ./2pc -c devnet begin $(solana-keygen pubkey alice.json) $(solana-keygen pubkey bob.json) --timeout 10                                                                                                     130 ↵
+
+Cluster     : devnet
+Coordinator : 5HbsftX6dPm64URQoJy88fJnjK4p15w3TxeAaHEsRmi5
+Participants: TMeKk4T8Xx7m8u8tUm2Tq6kUteEG9o4cJ5sQDAuSxPy, 2xzjqGZSQWbVk8937nG1sDvc7inQTswgQ9qbwAAw6WFh
+Timeout     : 10 slots
+Nonce       : 1773584601158
+TX account  : Bfb7KE8ChjsqFjzQsmBYpPDdZ52QUZqScz8VJqQrVnes
+
+✅ Transaction created
+Signature  : 61bwACpRnuZ1NBQbENVCvMyEcRSN5A1jbxdWKxTFtSddpGrvQrvpUTWy6vthEw9BsNPuySKpbjE9dxrPZK6xm43r
+TX account : Bfb7KE8ChjsqFjzQsmBYpPDdZ52QUZqScz8VJqQrVnes
+Explorer   : https://explorer.solana.com/tx/61bwACpRnuZ1NBQbENVCvMyEcRSN5A1jbxdWKxTFtSddpGrvQrvpUTWy6vthEw9BsNPuySKpbjE9dxrPZK6xm43r?cluster=devnet
+
+💾 Saved to .2pc-env
+2pc> ./2pc -c devnet timeout-abort
+
+Phase       : PREPARING
+Timeout slot: 448665923
+Current slot: 448665950
+Expired     : YES
+
+✅ ABORTED (timeout)
+Explorer : https://explorer.solana.com/tx/4jXaosbPSff4g1fbDknJKLPEcCzRoGHSKULSKeQ6jbyHwyTmAum6BG4ZxuUyF3AJBDgA2BygEYpmuKtH2FbiSV2Z?cluster=devnet
+2pc> ./2pc -c devnet status
+
+────────────────────────────────────────────────────────
+  2PC Transaction Status
+────────────────────────────────────────────────────────
+  Account     : Bfb7KE8ChjsqFjzQsmBYpPDdZ52QUZqScz8VJqQrVnes
+  Phase       : ABORTED ❌
+  Coordinator : 5HbsftX6dPm64URQoJy88fJnjK4p15w3TxeAaHEsRmi5
+  Timeout     : 448665923 (EXPIRED)
+  Yes votes   : 0/2
+────────────────────────────────────────────────────────
+  [1] pending
+  [2] pending
+────────────────────────────────────────────────────────
+  Explorer: https://explorer.solana.com/address/Bfb7KE8ChjsqFjzQsmBYpPDdZ52QUZqScz8VJqQrVnes?cluster=devnet
+2pc> ./2pc -c devnet close
+
+✅ Accounts closed, rent reclaimed
+Explorer : https://explorer.solana.com/tx/4kefeLP6qYdLVZJqMkqY7RaCZy9MeRtM2qwB8dQm4TSZ3LuFSvKeuBxpF3GN7tWSwzjKbyn1aHxYSiE5HCt8GHk?cluster=devnet
+```
 ---
 
 ## References

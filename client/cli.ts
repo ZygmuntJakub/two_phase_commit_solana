@@ -4,6 +4,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { BN, Program } from "@coral-xyz/anchor";
 import { Command } from "commander";
 import { TwoPhaseCommit } from "../target/types/two_phase_commit";
+import { DemoParticipant } from "../target/types/demo_participant";
 import { Keypair, PublicKey, Connection, clusterApiUrl } from "@solana/web3.js";
 import fs from "fs";
 import os from "os";
@@ -336,6 +337,71 @@ cli
     console.log(`  Explorer: ${explorerAddressUrl(txAcc.toBase58(), cluster)}`);
   });
 
+cli
+  .command("init-hook <participant> [hook_program]")
+  .description("Initialize hook state PDA for a participant")
+  .option("-k, --keypair <path>", "payer keypair", DEFAULT_KEYPAIR)
+  .action(async (participantArg: string, hookProgramArg: string | undefined, opts) => {
+    const cluster = cli.opts().cluster;
+    const { wallet } = setupProgram(opts.keypair, cluster);
+    const participant = new PublicKey(participantArg);
+    const hookProgramId = new PublicKey(resolveArg(hookProgramArg, "HOOK", "hook program"));
+
+    const connection = new Connection(clusterUrl(cluster), "confirmed");
+    const provider = new anchor.AnchorProvider(connection, new anchor.Wallet(wallet), { commitment: "confirmed" });
+    anchor.setProvider(provider);
+
+    const idl = JSON.parse(fs.readFileSync(path.join(__dirname, "../target/idl/demo_participant.json"), "utf-8"));
+    const hookProgram = new Program<DemoParticipant>(idl, provider);
+
+    const [statePda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("hook_state"), participant.toBuffer()],
+      hookProgramId
+    );
+
+    console.log(`\nParticipant : ${participant.toBase58()}`);
+    console.log(`Hook program: ${hookProgramId.toBase58()}`);
+    console.log(`State PDA   : ${statePda.toBase58()}`);
+
+    const sig = await hookProgram.methods
+      .initialize(participant)
+      .accounts({ payer: wallet.publicKey, state: statePda } as any)
+      .rpc();
+
+    writeEnv("HOOK", hookProgramId.toBase58());
+    console.log(`\n✅ Hook state initialized`);
+    console.log(`Explorer : ${explorerUrl(sig, cluster)}`);
+    console.log(`\n💾 Saved HOOK to .2pc-env`);
+  });
+
+cli
+  .command("hook-status <participant> [hook_program]")
+  .description("Show hook state PDA for a participant — hook_program defaults to HOOK in .2pc-env")
+  .action(async (participantArg: string, hookProgramArg: string | undefined) => {
+    const cluster = cli.opts().cluster;
+    const { wallet } = setupProgram(DEFAULT_KEYPAIR, cluster);
+    const participant = new PublicKey(participantArg);
+    const hookProgramId = new PublicKey(resolveArg(hookProgramArg, "HOOK", "hook program"));
+
+    const connection = new Connection(clusterUrl(cluster), "confirmed");
+    const provider = new anchor.AnchorProvider(connection, new anchor.Wallet(wallet), { commitment: "confirmed" });
+    anchor.setProvider(provider);
+
+    const idl = JSON.parse(fs.readFileSync(path.join(__dirname, "../target/idl/demo_participant.json"), "utf-8"));
+    const hookProgram = new Program<DemoParticipant>(idl, provider);
+
+    const [statePda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("hook_state"), participant.toBuffer()],
+      hookProgramId
+    );
+
+    const state = await hookProgram.account.participantState.fetch(statePda);
+
+    console.log(`\nParticipant : ${participant.toBase58()}`);
+    console.log(`State PDA   : ${statePda.toBase58()}`);
+    console.log(`Finalized   : ${state.finalized}`);
+    console.log(`Committed   : ${state.committed}`);
+  });
 
 cli.parseAsync(process.argv).catch((err) => {
   console.error("\n❌", err.message ?? err);
