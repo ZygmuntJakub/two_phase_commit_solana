@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 use densol::{Compress, Lz4 as Strategy};
 
+// 10 participants keeps the Transaction2PC account within the 1088-byte allocation
+// and ensures each transaction fits comfortably in a single Solana transaction
+// (compute budget ~1.4M CUs for 10 CPI hook calls, well under the 1.4M limit).
 pub const MAX_PARTICIPANTS: usize = 10;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]

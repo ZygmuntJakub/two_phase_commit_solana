@@ -149,7 +149,6 @@ This makes the decision and its execution atomic. Neither program updates its st
 ./2pc abort <TX>
 ./2pc timeout-abort <TX>
 ./2pc close <TX>
-./2pc watchdog              # auto-abort expired transactions (run as a background process)
 ```
 
 ## Demo

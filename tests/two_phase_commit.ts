@@ -573,6 +573,57 @@ describe("two_phase_commit", () => {
     );
   });
 
+  it("CPI hooks: hook failure rolls back commit() — tx stays in Committing", async () => {
+    // p1 initializes its hook state; p2 does NOT.
+    // When commit() fires hooks, the CPI for p2 fails (AccountNotInitialized),
+    // rolling back the entire transaction — tx remains in Committing.
+    const p1 = Keypair.generate(); const p2 = Keypair.generate();
+    await Promise.all([airdrop(p1), airdrop(p2)]);
+    const p1Pda = hookStatePda(p1.publicKey, demoProgram.programId);
+    const p2Pda = hookStatePda(p2.publicKey, demoProgram.programId);
+
+    // Only p1 sets up its hook state
+    await demoProgram.methods.initialize(p1.publicKey)
+      .accounts({ payer: coordinator.publicKey, state: p1Pda } as any)
+      .signers([coordinator]).rpc();
+    // p2Pda intentionally NOT initialized
+
+    const n = nextNonce();
+    const txAcc = txPda(coordinator.publicKey, n, program.programId);
+
+    await program.methods.beginTransaction([p1.publicKey, p2.publicKey], new BN(100), n)
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .signers([coordinator]).rpc();
+
+    await program.methods.castVote({ yes: {} }, demoProgram.programId)
+      .accounts({ participant: p1.publicKey, transaction: txAcc } as any)
+      .signers([p1]).rpc();
+    await program.methods.castVote({ yes: {} }, demoProgram.programId)
+      .accounts({ participant: p2.publicKey, transaction: txAcc } as any)
+      .signers([p2]).rpc();
+
+    const beforeCommit = await program.account.transaction2Pc.fetch(txAcc);
+    assert.ok("committing" in beforeCommit.phase);
+
+    // commit() should fail — p2's hook state PDA is uninitialized
+    await expectError(
+      () => program.methods.commit()
+        .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+        .remainingAccounts([
+          { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+          { pubkey: p1Pda, isWritable: true, isSigner: false },
+          { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+          { pubkey: p2Pda, isWritable: true, isSigner: false },
+        ])
+        .signers([coordinator]).rpc(),
+      "AccountNotInitialized"
+    );
+
+    // tx must still be in Committing — the whole commit() was rolled back
+    const afterFail = await program.account.transaction2Pc.fetch(txAcc);
+    assert.ok("committing" in afterFail.phase, "tx rolled back to Committing");
+  });
+
   it("CPI hooks: on_2pc_abort fires when abort() called", async () => {
     const p1 = Keypair.generate(); const p2 = Keypair.generate();
     await Promise.all([airdrop(p1), airdrop(p2)]);
