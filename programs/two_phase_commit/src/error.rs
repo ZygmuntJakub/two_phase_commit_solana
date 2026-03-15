@@ -30,4 +30,6 @@ pub enum ErrorCode {
     MissingHookAccount,
     #[msg("Failed to decompress participant list")]
     DecompressionError,
+    #[msg("Signer is not the transaction coordinator")]
+    NotCoordinator,
 }

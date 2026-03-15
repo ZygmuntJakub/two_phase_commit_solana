@@ -12,8 +12,7 @@ pub struct HookEntry {
     pub participant: Pubkey,
 }
 
-// Space breakdown:
-// discriminator:          8
+// Space breakdown (excluding 8-byte discriminator):
 // version:                1
 // coordinator:           32
 // participants Vec:   4 + 320 (worst-case uncompressed; LZ4 typically reduces this)
@@ -25,7 +24,9 @@ pub struct HookEntry {
 // timeout_slot:           8
 // nonce:                  8
 // bump:                   1
-// TOTAL:               1063  → 1088 with padding
+// FIELDS TOTAL:        1055 → padded to 1088
+// + discriminator:        8
+// ACCOUNT TOTAL:       1096  (33 bytes of margin)
 pub const TRANSACTION_2PC_SIZE: usize = 8 + 1088;
 
 #[account]

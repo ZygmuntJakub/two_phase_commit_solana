@@ -439,7 +439,151 @@ describe("two_phase_commit", () => {
     assert.equal(closed, null, "transaction account should be closed");
   });
 
-  it("commit: wrong coordinator rejected", async () => {
+  it("commit: rejected in Preparing phase", async () => {
+    const n = nextNonce();
+    const txAcc = txPda(coordinator.publicKey, n, program.programId);
+
+    await program.methods
+      .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .signers([coordinator])
+      .rpc();
+
+    // only one YES — still in Preparing
+    await program.methods
+      .castVote({ yes: {} }, null)
+      .accounts({ participant: alice.publicKey, transaction: txAcc } as any)
+      .signers([alice])
+      .rpc();
+
+    await expectError(
+      () =>
+        program.methods
+          .commit()
+          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+          .signers([coordinator])
+          .rpc(),
+      "InvalidPhase"
+    );
+  });
+
+  it("abort: rejected in Preparing phase", async () => {
+    const n = nextNonce();
+    const txAcc = txPda(coordinator.publicKey, n, program.programId);
+
+    await program.methods
+      .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .signers([coordinator])
+      .rpc();
+
+    await expectError(
+      () =>
+        program.methods
+          .abort()
+          .accounts({ transaction: txAcc } as any)
+          .rpc(),
+      "InvalidPhase"
+    );
+  });
+
+  it("close_transaction: rejected in Committing and Aborting phases", async () => {
+    // Committing
+    const n1 = nextNonce();
+    const txAcc1 = txPda(coordinator.publicKey, n1, program.programId);
+
+    await program.methods
+      .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n1)
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc1 } as any)
+      .signers([coordinator])
+      .rpc();
+
+    await program.methods
+      .castVote({ yes: {} }, null)
+      .accounts({ participant: alice.publicKey, transaction: txAcc1 } as any)
+      .signers([alice])
+      .rpc();
+
+    await program.methods
+      .castVote({ yes: {} }, null)
+      .accounts({ participant: bob.publicKey, transaction: txAcc1 } as any)
+      .signers([bob])
+      .rpc();
+
+    await expectError(
+      () =>
+        program.methods
+          .closeTransaction()
+          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc1 } as any)
+          .signers([coordinator])
+          .rpc(),
+      "NotTerminal"
+    );
+
+    // Aborting
+    const n2 = nextNonce();
+    const txAcc2 = txPda(coordinator.publicKey, n2, program.programId);
+
+    await program.methods
+      .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n2)
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc2 } as any)
+      .signers([coordinator])
+      .rpc();
+
+    await program.methods
+      .castVote({ no: {} }, null)
+      .accounts({ participant: alice.publicKey, transaction: txAcc2 } as any)
+      .signers([alice])
+      .rpc();
+
+    await expectError(
+      () =>
+        program.methods
+          .closeTransaction()
+          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc2 } as any)
+          .signers([coordinator])
+          .rpc(),
+      "NotTerminal"
+    );
+  });
+
+  it("coordinator can be a participant and vote", async () => {
+    const n = nextNonce();
+    const txAcc = txPda(coordinator.publicKey, n, program.programId);
+
+    // coordinator is also alice (participant)
+    await program.methods
+      .beginTransaction([coordinator.publicKey, bob.publicKey], new BN(100), n)
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .signers([coordinator])
+      .rpc();
+
+    await program.methods
+      .castVote({ yes: {} }, null)
+      .accounts({ participant: coordinator.publicKey, transaction: txAcc } as any)
+      .signers([coordinator])
+      .rpc();
+
+    await program.methods
+      .castVote({ yes: {} }, null)
+      .accounts({ participant: bob.publicKey, transaction: txAcc } as any)
+      .signers([bob])
+      .rpc();
+
+    const state = await program.account.transaction2Pc.fetch(txAcc);
+    assert.ok("committing" in state.phase);
+
+    await program.methods
+      .commit()
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .signers([coordinator])
+      .rpc();
+
+    const final = await program.account.transaction2Pc.fetch(txAcc);
+    assert.ok("committed" in final.phase, "coordinator as participant can vote and commit");
+  });
+
+  it("commit: wrong coordinator rejected (NotCoordinator)", async () => {
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
 
@@ -468,7 +612,7 @@ describe("two_phase_commit", () => {
           .accounts({ coordinator: charlie.publicKey, transaction: txAcc } as any)
           .signers([charlie])
           .rpc(),
-      "NotAParticipant"
+      "NotCoordinator"
     );
   });
 
@@ -507,7 +651,7 @@ describe("two_phase_commit", () => {
           .accounts({ coordinator: alice.publicKey, transaction: txAcc } as any)
           .signers([alice])
           .rpc(),
-      "NotAParticipant"
+      "NotCoordinator"
     );
   });
 

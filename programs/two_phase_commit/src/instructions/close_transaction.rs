@@ -10,7 +10,7 @@ pub struct CloseTransaction<'info> {
     #[account(
         mut,
         close = coordinator,
-        constraint = transaction.coordinator == coordinator.key() @ ErrorCode::NotAParticipant,
+        constraint = transaction.coordinator == coordinator.key() @ ErrorCode::NotCoordinator,
         constraint = (transaction.phase == Phase::Committed || transaction.phase == Phase::Aborted) @ ErrorCode::NotTerminal,
     )]
     pub transaction: Account<'info, Transaction2PC>,

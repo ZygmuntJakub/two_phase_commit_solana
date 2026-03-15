@@ -9,7 +9,7 @@ pub struct Commit<'info> {
 
     #[account(
         mut,
-        constraint = transaction.coordinator == coordinator.key() @ ErrorCode::NotAParticipant,
+        constraint = transaction.coordinator == coordinator.key() @ ErrorCode::NotCoordinator,
         constraint = transaction.phase == Phase::Committing @ ErrorCode::InvalidPhase,
     )]
     pub transaction: Account<'info, Transaction2PC>,
