@@ -43,6 +43,25 @@ For transactions that expire without a decision, `timeout_abort` is permissionle
 
 ---
 
+## Web2 vs Solana
+
+| Property | Traditional 2PC | On-Chain 2PC |
+|---|---|---|
+| Coordinator state | Private (local WAL) | Public (ledger, immediately visible) |
+| Coordinator crash | In-doubt transaction — participants hold locks indefinitely | Decision already written; no locks, no recovery needed |
+| Recovery mechanism | Manual DBA intervention or recovery coordinator | Permissionless `timeout_abort` callable by anyone |
+| Participant locks | Held until coordinator recovers | No application-level locks; Solana account model handles concurrency |
+| Audit trail | DB logs (mutable, local) | Immutable on-chain events (`TransactionBegun`, `VoteCast`, `TransactionFinalized`) |
+| Execution on finalization | Separate application logic after commit/abort | CPI hooks fire atomically in the same transaction |
+| Max participants | Unlimited (network-bound) | 10 (account size + compute budget) |
+| Finality | Durable after WAL flush | Confirmed after ~2 slots (~800ms) |
+| Who can abort expired tx | DBA / recovery process | Anyone (permissionless) |
+| Replay protection | XID sequence (per-DB) | PDA seed includes coordinator + nonce |
+
+**Key tradeoff:** Solana solves the coordinator crash problem at the cost of participant count limits and compute budget constraints. A traditional 2PC can coordinate hundreds of participants; this implementation caps at 10. For the use cases 2PC is most valuable (atomic cross-program state changes), 10 participants is sufficient.
+
+---
+
 ## State machine
 
 ```
@@ -73,7 +92,7 @@ pub struct Transaction2PC {
     pub participant_count: u8, // number of participants
     pub phase: Phase, // current phase of the transaction
     pub votes: Vec<Option<Vote>>, // votes of the participants
-    pub hooks: Vec<Option<Pubkey>>,   // CPI callback program per participant
+    pub hooks: Vec<Option<HookEntry>>, // CPI hook (program_id + participant) per participant
     pub yes_count: u8, // number of YES votes (cached to avoid re-counting on each vote)
     pub timeout_slot: u64, // slot at which the transaction will be aborted if not committed
     pub nonce: u64, // nonce to prevent reuse of the PDA
