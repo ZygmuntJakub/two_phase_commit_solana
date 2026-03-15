@@ -32,6 +32,10 @@ pub mod two_phase_commit {
         instructions::commit::commit(ctx)
     }
 
+    pub fn commit_no_hooks(ctx: Context<CommitNoHooks>) -> Result<()> {
+        instructions::commit_no_hooks::commit_no_hooks(ctx)
+    }
+
     pub fn abort<'info>(ctx: Context<'_, '_, '_, 'info, Abort<'info>>) -> Result<()> {
         instructions::abort::abort(ctx)
     }

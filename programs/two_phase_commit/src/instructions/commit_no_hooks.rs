@@ -3,8 +3,13 @@ use crate::events::*;
 use crate::state::*;
 use crate::error::ErrorCode;
 
+/// Permissionless fallback for hook-griefing scenarios.
+///
+/// When phase is Committing (all votes YES), any caller can invoke
+/// `commit_no_hooks` to finalize the transaction without firing CPI hooks.
+/// Use this when a malicious or buggy hook is blocking `commit()`.
 #[derive(Accounts)]
-pub struct Commit<'info> {
+pub struct CommitNoHooks<'info> {
     #[account(
         mut,
         constraint = transaction.phase == Phase::Committing @ ErrorCode::InvalidPhase,
@@ -13,12 +18,9 @@ pub struct Commit<'info> {
     pub transaction: Account<'info, Transaction2PC>,
 }
 
-pub fn commit<'info>(ctx: Context<'_, '_, '_, 'info, Commit<'info>>) -> Result<()> {
+pub fn commit_no_hooks(ctx: Context<CommitNoHooks>) -> Result<()> {
     let tx_key = ctx.accounts.transaction.key();
     ctx.accounts.transaction.phase = Phase::Committed;
-    let hooks = ctx.accounts.transaction.hooks.clone();
     emit!(TransactionFinalized { transaction: tx_key, committed: true });
-
-    let tx_info = ctx.accounts.transaction.to_account_info();
-    crate::hooks::fire_hooks(&hooks, "on_2pc_commit", tx_key, &tx_info, ctx.remaining_accounts)
+    Ok(())
 }

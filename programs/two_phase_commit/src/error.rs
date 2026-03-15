@@ -32,4 +32,6 @@ pub enum ErrorCode {
     DecompressionError,
     #[msg("Signer is not the transaction coordinator")]
     NotCoordinator,
+    #[msg("hook_program is not an executable program account")]
+    HookNotExecutable,
 }
