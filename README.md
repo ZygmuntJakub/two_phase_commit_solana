@@ -1,6 +1,6 @@
 # Two-Phase Commit — On-Chain
 
-**Program ID:** `2PCPgunAXWWUSiKGChz6UQuspAz6Tgqc7mNdWkanGSMM` · [Devnet](https://explorer.solana.com/address/2PCPgunAXWWUSiKGChz6UQuspAz6Tgqc7mNdWkanGSMM?cluster=devnet)
+**Program ID:** `2PCPgunAXWWUSiKGChz6UQuspAz6Tgqc7mNdWkanGSMM` [Devnet](https://explorer.solana.com/address/2PCPgunAXWWUSiKGChz6UQuspAz6Tgqc7mNdWkanGSMM?cluster=devnet)
 
 Two-Phase Commit (2PC) is the algorithm that makes distributed database transactions possible. It's been running inside PostgreSQL, MySQL, and Oracle since 1978. This project is a faithful implementation of the protocol as an on-chain Solana program — and it accidentally fixes the one flaw 2PC has had for 47 years.
 
@@ -132,9 +132,50 @@ Participants are stored LZ4-compressed using [densol](https://crates.io/crates/d
 
 ## Running locally
 
+**Prerequisites:**
+- [Rust](https://rustup.rs/) (edition 2021)
+- [Solana CLI](https://docs.solana.com/cli/install-solana-cli-tools) ≥ 1.18
+- [Anchor CLI](https://www.anchor-lang.com/docs/installation) 0.32.1
+- Node.js ≥ 18, yarn
+
+**Tests** (spin up a local validator automatically):
+
 ```bash
-npm install
+yarn install
 anchor test
+```
+
+**CLI** run against a local validator:
+
+```bash
+# Make the CLI executable
+chmod +x client/cli.ts
+
+# Point Solana CLI to localnet
+solana config set --url localhost
+
+# Generate a coordinator keypair if needed
+solana-keygen new --outfile ~/.config/solana/id.json
+
+# Start local validator in a separate terminal
+solana-test-validator
+
+# Deploy programs
+anchor deploy
+
+# Generate two participant keypairs and airdrop SOL
+solana-keygen new --no-bip39-passphrase -o /tmp/p1.json
+solana-keygen new --no-bip39-passphrase -o /tmp/p2.json
+solana airdrop 2 $(solana-keygen pubkey /tmp/p1.json)
+solana airdrop 2 $(solana-keygen pubkey /tmp/p2.json)
+
+# Run — without hooks
+./2pc begin $(solana-keygen pubkey /tmp/p1.json) $(solana-keygen pubkey /tmp/p2.json) --timeout 300
+./2pc vote yes --keypair /tmp/p1.json
+./2pc vote yes --keypair /tmp/p2.json
+./2pc commit
+./2pc status
+./2pc close
 ```
 
 ## CPI hooks
