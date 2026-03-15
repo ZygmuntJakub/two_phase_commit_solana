@@ -34,4 +34,6 @@ pub enum ErrorCode {
     NotCoordinator,
     #[msg("hook_program is not an executable program account")]
     HookNotExecutable,
+    #[msg("hook account key does not match the registered hook_program pubkey")]
+    HookKeyMismatch,
 }

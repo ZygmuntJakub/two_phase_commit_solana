@@ -54,7 +54,7 @@ For transactions that expire without a decision, `timeout_abort` is permissionle
 | Recovery mechanism | Manual DBA intervention or recovery coordinator | Permissionless `timeout_abort` callable by anyone |
 | Participant locks | Held until coordinator recovers | No application-level locks; Solana account model handles concurrency |
 | Audit trail | DB logs (mutable, local) | Immutable on-chain events (`TransactionBegun`, `VoteCast`, `TransactionFinalized`) |
-| Execution on finalization | Separate application logic after commit/abort | CPI hooks fire atomically in the same transaction |
+| Execution on finalization | Separate application logic after commit/abort | CPI hooks fire in the same transaction via `commit()`; `commit_no_hooks()` skips them as a griefing fallback |
 | Max participants | Unlimited (network-bound) | 10 (account size + compute budget) |
 | Finality | Durable after WAL flush | Confirmed after ~2 slots (~800ms) |
 | Who can abort expired tx | DBA / recovery process | Anyone (permissionless) |
@@ -74,11 +74,12 @@ For transactions that expire without a decision, `timeout_abort` is permissionle
       COMMITTING          ABORTING ◄── timeout_abort
            |                 |
         commit()         abort() / timeout_abort
-           |                 |
-       COMMITTED           ABORTED
+   commit_no_hooks()          |
+           |             ABORTED
+       COMMITTED
 ```
 
-`timeout_abort` is blocked in COMMITTING. Once all participants voted YES, the commit decision is logically final. Aborting at that point would violate the 2PC invariant. If the coordinator disappears after all YES votes, the transaction stays in COMMITTING, but anyone can verify the outcome by reading the on-chain votes.
+`timeout_abort` is blocked in COMMITTING. Once all participants voted YES, the commit decision is logically final. Aborting at that point would violate the 2PC invariant. If the coordinator disappears after all YES votes, the transaction stays in COMMITTING — but `commit()` and `commit_no_hooks()` are both permissionless, so any wallet can finalize it.
 
 ---
 
@@ -114,7 +115,8 @@ Participants are stored LZ4-compressed using [densol](https://crates.io/crates/d
 |---|---|---|
 | `begin_transaction` | coordinator | |
 | `cast_vote(vote, hook_program?)` | participant | phase == Preparing, not expired |
-| `commit` | coordinator | phase == Committing; fires `on_2pc_commit` hooks |
+| `commit` | anyone | phase == Committing; fires `on_2pc_commit` hooks |
+| `commit_no_hooks` | anyone | phase == Committing; skips hooks (hook-griefing fallback) |
 | `abort` | anyone | phase == Aborting; fires `on_2pc_abort` hooks |
 | `timeout_abort` | anyone | expired, phase != Committing; fires `on_2pc_abort` hooks |
 | `close_transaction` | coordinator | terminal state |
@@ -198,7 +200,9 @@ This makes the decision and its execution atomic. Neither program updates its st
 
 `programs/demo_participant` shows the minimal interface a hook program must implement.
 
-**Tradeoff:** if a hook program panics or returns an error, the entire `commit()` transaction fails. This means participants must trust each other's hook implementations, the same social contract as 2PC itself. A buggy or malicious hook can delay commit, but cannot forge votes or steal funds.
+**Tradeoff:** if a hook program panics or returns an error, the entire `commit()` transaction fails and the transaction stays in COMMITTING. A participant could exploit this by registering a hook that always panics, permanently blocking `commit()`.
+
+The escape hatch is `commit_no_hooks`: any wallet can call it to finalize without executing any hooks. This defeats hook-griefing, but introduces a different tradeoff — there is no enforcement that `commit()` must be tried first. Any wallet may call `commit_no_hooks` immediately after all votes are cast, skipping hooks even when they are fully operational. Applications that require hooks to execute on every commit cannot rely on this as a hard guarantee in an adversarial environment. Hooks are best-effort, not atomic, when untrusted callers are present.
 
 ---
 
