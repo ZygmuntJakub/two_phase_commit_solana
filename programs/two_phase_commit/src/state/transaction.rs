@@ -51,7 +51,7 @@ impl Transaction2PC {
     pub fn pubkey_list(&self) -> Result<Vec<Pubkey>> {
         let bytes = self
             .get_participants()
-            .map_err(|_| error!(crate::error::ErrorCode::InvalidPhase))?;
+            .map_err(|_| error!(crate::error::ErrorCode::DecompressionError))?;
         Ok(bytes
             .chunks_exact(32)
             .map(|chunk| Pubkey::from(<[u8; 32]>::try_from(chunk).unwrap()))
@@ -61,7 +61,7 @@ impl Transaction2PC {
     pub fn store_pubkeys(&mut self, pubkeys: &[Pubkey]) -> Result<()> {
         let bytes: Vec<u8> = pubkeys.iter().flat_map(|p| p.to_bytes()).collect();
         self.set_participants(&bytes)
-            .map_err(|_| error!(crate::error::ErrorCode::InvalidPhase))
+            .map_err(|_| error!(crate::error::ErrorCode::DecompressionError))
     }
 }
 

@@ -28,4 +28,6 @@ pub enum ErrorCode {
     CannotTimeoutCommitting,
     #[msg("Missing hook account in remaining_accounts")]
     MissingHookAccount,
+    #[msg("Failed to decompress participant list")]
+    DecompressionError,
 }

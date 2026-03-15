@@ -301,6 +301,45 @@ describe("two_phase_commit", () => {
     );
   });
 
+  it("validation: timeout_slots = 0 rejected", async () => {
+    const n = nextNonce();
+    const txAcc = txPda(coordinator.publicKey, n, program.programId);
+
+    await expectError(
+      () =>
+        program.methods
+          .beginTransaction([alice.publicKey, bob.publicKey], new BN(0), n)
+          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+          .signers([coordinator])
+          .rpc(),
+      "InvalidTimeoutSlots"
+    );
+  });
+
+  it("vote rejected after timeout_slot passes", async () => {
+    const n = nextNonce();
+    const txAcc = txPda(coordinator.publicKey, n, program.programId);
+
+    await program.methods
+      .beginTransaction([alice.publicKey, bob.publicKey], new BN(1), n)
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .signers([coordinator])
+      .rpc();
+
+    const state = await program.account.transaction2Pc.fetch(txAcc);
+    await waitForSlot(provider.connection, state.timeoutSlot.toNumber());
+
+    await expectError(
+      () =>
+        program.methods
+          .castVote({ yes: {} }, null)
+          .accounts({ participant: alice.publicKey, transaction: txAcc } as any)
+          .signers([alice])
+          .rpc(),
+      "TransactionExpired"
+    );
+  });
+
   it("validation: fewer than 2 participants rejected", async () => {
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);

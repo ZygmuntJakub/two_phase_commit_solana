@@ -10,25 +10,23 @@ pub struct TimeoutAbort<'info> {
 }
 
 pub fn timeout_abort<'info>(ctx: Context<'_, '_, '_, 'info, TimeoutAbort<'info>>) -> Result<()> {
-    let tx = &mut ctx.accounts.transaction;
-
     require!(
-        tx.phase != Phase::Committing,
+        ctx.accounts.transaction.phase != Phase::Committing,
         ErrorCode::CannotTimeoutCommitting
     );
     require!(
-        tx.phase == Phase::Preparing || tx.phase == Phase::Aborting,
+        ctx.accounts.transaction.phase == Phase::Preparing
+            || ctx.accounts.transaction.phase == Phase::Aborting,
         ErrorCode::InvalidPhase
     );
 
     let clock = Clock::get()?;
-    require!(clock.slot > tx.timeout_slot, ErrorCode::NotYetExpired);
+    require!(clock.slot > ctx.accounts.transaction.timeout_slot, ErrorCode::NotYetExpired);
 
-    let tx_key = tx.key();
-    tx.phase = Phase::Aborted;
-    let hooks = tx.hooks.clone();
+    let tx_key = ctx.accounts.transaction.key();
+    ctx.accounts.transaction.phase = Phase::Aborted;
+    let hooks = ctx.accounts.transaction.hooks.clone();
     emit!(TransactionFinalized { transaction: tx_key, committed: false });
-    let _ = tx;
 
     let tx_info = ctx.accounts.transaction.to_account_info();
     crate::hooks::fire_hooks(&hooks, "on_2pc_abort", tx_key, &tx_info, ctx.remaining_accounts)

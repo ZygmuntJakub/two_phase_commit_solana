@@ -1,14 +1,14 @@
-# Two-Phase Commit — On-Chain
+# Two-Phase Commit: On-Chain
 
 **Program ID:** `2PCPgunAXWWUSiKGChz6UQuspAz6Tgqc7mNdWkanGSMM` [Devnet](https://explorer.solana.com/address/2PCPgunAXWWUSiKGChz6UQuspAz6Tgqc7mNdWkanGSMM?cluster=devnet)
 
-Two-Phase Commit (2PC) is the algorithm that makes distributed database transactions possible. It's been running inside PostgreSQL, MySQL, and Oracle since 1978. This project is a faithful implementation of the protocol as an on-chain Solana program — and it accidentally fixes the one flaw 2PC has had for 47 years.
+Two-Phase Commit (2PC) is the algorithm that makes distributed database transactions possible. It's been running inside PostgreSQL, MySQL, and Oracle since 1978. This project is a faithful implementation of the protocol as an on-chain Solana program, and it accidentally fixes the one flaw 2PC has had for 47 years.
 
 ---
 
 ## The problem with Web2 2PC
 
-The protocol is simple: a coordinator asks all participants to vote YES or NO, then sends COMMIT or ABORT based on the result. A YES vote is a promise — "I have durable state and can commit at any point."
+The protocol is simple: a coordinator asks all participants to vote YES or NO, then sends COMMIT or ABORT based on the result. A YES vote is a promise: "I have durable state and can commit at any point."
 
 ```
 Phase 1:  Coordinator ──PREPARE──► A, B
@@ -27,7 +27,7 @@ Every proposed fix (Three-Phase Commit, Paxos Commit, Presumed Abort) adds compl
 
 ## Why on-chain?
 
-The root cause is that coordinator state is **private**. When the coordinator decides to commit, only it knows — until it successfully notifies everyone. A crash in that window loses the decision.
+The root cause is that coordinator state is **private**. When the coordinator decides to commit, only it knows. Until it successfully notifies everyone, a crash loses the decision. A crash in that window loses the decision.
 
 On Solana, a coordinator "crash" changes nothing:
 
@@ -39,7 +39,7 @@ Solana: crash → decision already in global ledger → visible to everyone → 
 
 A Solana transaction either lands in the ledger or it doesn't. There is no intermediate state. The moment the coordinator writes its decision, every participant in the world can read it.
 
-For transactions that expire without a decision, `timeout_abort` is permissionless — any wallet can call it. No DBA required. No recovery coordinator. No Paxos.
+For transactions that expire without a decision, `timeout_abort` is permissionless. Any wallet can call it. No DBA required. No recovery coordinator. No Paxos.
 
 ---
 
@@ -48,7 +48,7 @@ For transactions that expire without a decision, `timeout_abort` is permissionle
 | Property | Traditional 2PC | On-Chain 2PC |
 |---|---|---|
 | Coordinator state | Private (local WAL) | Public (ledger, immediately visible) |
-| Coordinator crash | In-doubt transaction — participants hold locks indefinitely | Decision already written; no locks, no recovery needed |
+| Coordinator crash | In-doubt transaction: participants hold locks indefinitely | Decision already written; no locks, no recovery needed |
 | Recovery mechanism | Manual DBA intervention or recovery coordinator | Permissionless `timeout_abort` callable by anyone |
 | Participant locks | Held until coordinator recovers | No application-level locks; Solana account model handles concurrency |
 | Audit trail | DB logs (mutable, local) | Immutable on-chain events (`TransactionBegun`, `VoteCast`, `TransactionFinalized`) |
@@ -76,7 +76,7 @@ For transactions that expire without a decision, `timeout_abort` is permissionle
        COMMITTED           ABORTED
 ```
 
-`timeout_abort` is blocked in COMMITTING. Once all participants voted YES, the commit decision is logically final — aborting would violate the 2PC invariant. If the coordinator disappears after all YES votes, the transaction stays in COMMITTING, but anyone can verify the outcome by reading the on-chain votes.
+`timeout_abort` is blocked in COMMITTING. Once all participants voted YES, the commit decision is logically final. Aborting at that point would violate the 2PC invariant. If the coordinator disappears after all YES votes, the transaction stays in COMMITTING, but anyone can verify the outcome by reading the on-chain votes.
 
 ---
 
@@ -102,7 +102,7 @@ pub struct Transaction2PC {
 
 Participants are stored LZ4-compressed using [densol](https://crates.io/crates/densol). For small lists the saving is slight. The pattern matters for programs with large variable-length data. Honestly, I used only for testing this concept purposes.
 
-`hooks` stores an optional program ID per participant. When a participant casts their vote, they can register a program that will be called via CPI when the transaction finalizes. This turns 2PC from a coordination ledger into an actual execution coordinator — commit and abort trigger state changes in participant programs atomically, in the same Solana transaction.
+`hooks` stores an optional program ID per participant. When a participant casts their vote, they can register a program that will be called via CPI when the transaction finalizes. This turns 2PC from a coordination ledger into an actual execution coordinator. Commit and abort trigger state changes in participant programs atomically, in the same Solana transaction.
 
 ---
 
@@ -110,11 +110,11 @@ Participants are stored LZ4-compressed using [densol](https://crates.io/crates/d
 
 | Instruction | Signer | Condition |
 |---|---|---|
-| `begin_transaction` | coordinator | — |
+| `begin_transaction` | coordinator | |
 | `cast_vote(vote, hook_program?)` | participant | phase == Preparing, not expired |
-| `commit` | coordinator | phase == Committing — fires `on_2pc_commit` hooks |
-| `abort` | anyone | phase == Aborting — fires `on_2pc_abort` hooks |
-| `timeout_abort` | anyone | expired, phase != Committing — fires `on_2pc_abort` hooks |
+| `commit` | coordinator | phase == Committing; fires `on_2pc_commit` hooks |
+| `abort` | anyone | phase == Aborting; fires `on_2pc_abort` hooks |
+| `timeout_abort` | anyone | expired, phase != Committing; fires `on_2pc_abort` hooks |
 | `close_transaction` | coordinator | terminal state |
 
 ---
@@ -145,7 +145,7 @@ yarn install
 anchor test
 ```
 
-**CLI** run against a local validator:
+**CLI** run against a local validator
 
 ```bash
 # Make the CLI executable
@@ -169,7 +169,7 @@ solana-keygen new --no-bip39-passphrase -o /tmp/p2.json
 solana airdrop 2 $(solana-keygen pubkey /tmp/p1.json)
 solana airdrop 2 $(solana-keygen pubkey /tmp/p2.json)
 
-# Run — without hooks
+# Run (without hooks)
 ./2pc begin $(solana-keygen pubkey /tmp/p1.json) $(solana-keygen pubkey /tmp/p2.json) --timeout 300
 ./2pc vote yes --keypair /tmp/p1.json
 ./2pc vote yes --keypair /tmp/p2.json
@@ -180,7 +180,7 @@ solana airdrop 2 $(solana-keygen pubkey /tmp/p2.json)
 
 ## CPI hooks
 
-A participant registers a hook program when casting their vote. When `commit` or `abort` fires, the 2PC program CPIs into every registered hook — in the same Solana transaction:
+A participant registers a hook program when casting their vote. When `commit` or `abort` fires, the 2PC program CPIs into every registered hook in the same Solana transaction:
 
 ```
 commit()
@@ -188,13 +188,13 @@ commit()
   └─ CPI ──► program_B::on_2pc_commit(transaction, state_B)
 ```
 
-This makes the decision and its execution atomic. Neither program updates its state until all votes are in — and when they do, both update in a single slot.
+This makes the decision and its execution atomic. Neither program updates its state until all votes are in. When they do, both update in a single slot.
 
 **Concrete example:** two SPL token programs coordinating an atomic swap. Each holds tokens in escrow during PREPARING. On commit, both `on_2pc_commit` handlers release tokens to the counterparty. On abort, both return tokens to the original owner. No trusted intermediary, no sequential settlement risk.
 
 `programs/demo_participant` shows the minimal interface a hook program must implement.
 
-**Tradeoff:** if a hook program panics or returns an error, the entire `commit()` transaction fails. This means participants must trust each other's hook implementations — the same social contract as 2PC itself. A buggy or malicious hook can delay commit, but cannot forge votes or steal funds.
+**Tradeoff:** if a hook program panics or returns an error, the entire `commit()` transaction fails. This means participants must trust each other's hook implementations, the same social contract as 2PC itself. A buggy or malicious hook can delay commit, but cannot forge votes or steal funds.
 
 ---
 
@@ -423,4 +423,4 @@ Explorer : https://explorer.solana.com/tx/4kefeLP6qYdLVZJqMkqY7RaCZy9MeRtM2qwB8d
 
 ## References
 
-- Kleppmann (2017) — *Designing Data-Intensive Applications*, ch. 9 (consistency and consensus)
+- Kleppmann (2017). *Designing Data-Intensive Applications*, ch. 9 (consistency and consensus)
