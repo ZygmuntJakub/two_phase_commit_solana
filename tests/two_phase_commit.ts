@@ -748,6 +748,31 @@ describe("two_phase_commit", () => {
     );
   });
 
+  it("cast_vote: mismatched hook account key rejected (HookKeyMismatch)", async () => {
+    const n = nextNonce();
+    const txAcc = txPda(coordinator.publicKey, n, program.programId);
+
+    await program.methods
+      .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .signers([coordinator])
+      .rpc();
+
+    // Claim hook is demoProgram but pass alice's account in remaining_accounts
+    await expectError(
+      () =>
+        program.methods
+          .castVote({ yes: {} }, demoProgram.programId)
+          .accounts({ participant: alice.publicKey, transaction: txAcc } as any)
+          .remainingAccounts([
+            { pubkey: alice.publicKey, isWritable: false, isSigner: false },
+          ])
+          .signers([alice])
+          .rpc(),
+      "HookKeyMismatch"
+    );
+  });
+
   it("cast_vote: non-executable hook_program rejected (HookNotExecutable)", async () => {
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
@@ -770,6 +795,33 @@ describe("two_phase_commit", () => {
           .signers([alice])
           .rpc(),
       "HookNotExecutable"
+    );
+  });
+
+  it("commit_no_hooks: rejected outside Committing phase (InvalidPhase)", async () => {
+    const n = nextNonce();
+    const txAcc = txPda(coordinator.publicKey, n, program.programId);
+
+    await program.methods
+      .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .signers([coordinator])
+      .rpc();
+
+    // Still in Preparing — only one YES
+    await program.methods
+      .castVote({ yes: {} }, null)
+      .accounts({ participant: alice.publicKey, transaction: txAcc } as any)
+      .signers([alice])
+      .rpc();
+
+    await expectError(
+      () =>
+        program.methods
+          .commitNoHooks()
+          .accounts({ transaction: txAcc } as any)
+          .rpc(),
+      "InvalidPhase"
     );
   });
 
