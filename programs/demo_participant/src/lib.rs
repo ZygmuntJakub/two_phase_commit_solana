@@ -2,6 +2,9 @@ use anchor_lang::prelude::*;
 
 declare_id!("7tQZaZaLooXGEXgpDfDakxMS69j4t8KsrqeGZYeLLbCn");
 
+// Only the 2PC coordinator program may invoke on_2pc_commit / on_2pc_abort.
+const TWO_PHASE_COMMIT_PROGRAM: Pubkey = pubkey!("2PCPgunAXWWUSiKGChz6UQuspAz6Tgqc7mNdWkanGSMM");
+
 #[program]
 pub mod demo_participant {
     use super::*;
@@ -48,7 +51,8 @@ pub struct Initialize<'info> {
 #[derive(Accounts)]
 #[instruction(participant: Pubkey)]
 pub struct OnFinalize<'info> {
-    /// CHECK: Passed by the 2PC coordinator via CPI — caller is trusted to provide a valid Transaction2PC account.
+    /// CHECK: Verified to be owned by the 2PC coordinator program, rejects direct calls from other programs.
+    #[account(owner = TWO_PHASE_COMMIT_PROGRAM)]
     pub transaction: UncheckedAccount<'info>,
 
     #[account(

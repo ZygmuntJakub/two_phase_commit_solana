@@ -439,6 +439,39 @@ describe("two_phase_commit", () => {
     assert.equal(closed, null, "transaction account should be closed");
   });
 
+  it("commit: wrong coordinator rejected", async () => {
+    const n = nextNonce();
+    const txAcc = txPda(coordinator.publicKey, n, program.programId);
+
+    await program.methods
+      .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
+      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .signers([coordinator])
+      .rpc();
+
+    await program.methods
+      .castVote({ yes: {} }, null)
+      .accounts({ participant: alice.publicKey, transaction: txAcc } as any)
+      .signers([alice])
+      .rpc();
+
+    await program.methods
+      .castVote({ yes: {} }, null)
+      .accounts({ participant: bob.publicKey, transaction: txAcc } as any)
+      .signers([bob])
+      .rpc();
+
+    await expectError(
+      () =>
+        program.methods
+          .commit()
+          .accounts({ coordinator: charlie.publicKey, transaction: txAcc } as any)
+          .signers([charlie])
+          .rpc(),
+      "NotAParticipant"
+    );
+  });
+
   it("close_transaction: wrong coordinator cannot close", async () => {
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);

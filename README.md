@@ -27,7 +27,7 @@ Every proposed fix (Three-Phase Commit, Paxos Commit, Presumed Abort) adds compl
 
 ## Why on-chain?
 
-The root cause is that coordinator state is **private**. When the coordinator decides to commit, only it knows. Until it successfully notifies everyone, a crash loses the decision. A crash in that window loses the decision.
+The root cause is that coordinator state is **private**. When the coordinator decides to commit, only it knows. Until it successfully notifies everyone, a crash loses the decision.
 
 On Solana, a coordinator "crash" changes nothing:
 
@@ -40,6 +40,8 @@ Solana: crash → decision already in global ledger → visible to everyone → 
 A Solana transaction either lands in the ledger or it doesn't. There is no intermediate state. The moment the coordinator writes its decision, every participant in the world can read it.
 
 For transactions that expire without a decision, `timeout_abort` is permissionless. Any wallet can call it. No DBA required. No recovery coordinator. No Paxos.
+
+**What this does not solve:** the participant crash problem. If a participant goes offline before casting a vote, the transaction stays in PREPARING until the timeout expires. This is the same behavior as traditional 2PC. The difference is that resolution is automatic (anyone calls `timeout_abort`) rather than manual.
 
 ---
 
@@ -147,11 +149,13 @@ anchor test
 
 **CLI** run against a local validator
 
+> The `--cluster` flag in `./2pc` sets the RPC endpoint for the TypeScript client. The `solana` CLI reads its own config separately. Make sure both point to the same cluster.
+
 ```bash
 # Make the CLI executable
 chmod +x client/cli.ts
 
-# Point Solana CLI to localnet
+# Point Solana CLI to localnet (must match --cluster flag used with ./2pc)
 solana config set --url localhost
 
 # Generate a coordinator keypair if needed
