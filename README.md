@@ -79,7 +79,7 @@ For transactions that expire without a decision, `timeout_abort` is permissionle
        COMMITTED
 ```
 
-`timeout_abort` is blocked in COMMITTING. Once all participants voted YES, the commit decision is logically final. Aborting at that point would violate the 2PC invariant. If the coordinator disappears after all YES votes, the transaction stays in COMMITTING — but `commit()` and `commit_no_hooks()` are both permissionless, so any wallet can finalize it.
+`timeout_abort` is blocked in COMMITTING. Once all participants voted YES, the commit decision is logically final. Aborting at that point would violate the 2PC invariant. If the coordinator disappears after all YES votes, the transaction stays in COMMITTING, but `commit()` and `commit_no_hooks()` are both permissionless, so any wallet can finalize it.
 
 ---
 
@@ -103,7 +103,7 @@ pub struct Transaction2PC {
 }
 ```
 
-Participants are stored LZ4-compressed using [densol](https://crates.io/crates/densol). For small lists the saving is slight. The pattern matters for programs with large variable-length data. Honestly, I used only for testing this concept purposes.
+Participants are stored LZ4-compressed using [densol](https://crates.io/crates/densol). For small lists the saving is slight. The pattern matters for programs with large variable-length data. I used it here to experiment with the pattern on-chain.
 
 `hooks` stores an optional program ID per participant. When a participant casts their vote, they can register a program that will be called via CPI when the transaction finalizes. This turns 2PC from a coordination ledger into an actual execution coordinator. Commit and abort trigger state changes in participant programs atomically, in the same Solana transaction.
 
@@ -127,10 +127,13 @@ Participants are stored LZ4-compressed using [densol](https://crates.io/crates/d
 
 | Step | Transaction |
 |---|---|
-| `begin_transaction` | [kwYj9BKnKJ4k...](https://explorer.solana.com/tx/kwYj9BKnKJ4keFFshuTDJhv8EzP6MHX9prAFLvQbNkHZ4vPZ4jXHtbgQfwx4snaVZyWEp3KX2xQFBdu9bqr8roJ?cluster=devnet) |
-| `cast_vote` (Alice YES) | [2cz6mvRYBWse...](https://explorer.solana.com/tx/2cz6mvRYBWsehfNDxCPfD8cvqwMQmoA425JUrhqUxTika8MjRSqVJD1d9Y5vwnH4bfjhpktmiPemFz4LrYk4gHBb?cluster=devnet) |
-| `cast_vote` (Bob YES) | [2DwqKY1VaVXS...](https://explorer.solana.com/tx/2DwqKY1VaVXSiZ2aN45qukshKGiFtPsv9p14xpRpH4wW1hmp6hFbXwupmBV5KiuYCHtrFoQ8zJagjhyubKDS7nYu?cluster=devnet) |
-| `commit` | [pC9ZvozmYj1Z...](https://explorer.solana.com/tx/pC9ZvozmYj1ZBqdz4kMi3H6vDD3gTdqqZdQfJiGMq97MJrQ1wrQM51SG5v9qtsJ2NaaTjrUzbfvE5YCCtPxTakn?cluster=devnet) |
+| `init_hook` (Alice) | [546GHKSPeEHX...](https://explorer.solana.com/tx/546GHKSPeEHXbzXGTAx1j9KjPBGqMqY28wbojxm3dmvRYHrJmKWCyqePvGJY5tZEj6HDBz21dUvQQsQgQt8wMrcT?cluster=devnet) |
+| `init_hook` (Bob) | [5FvYaqzjHLbS...](https://explorer.solana.com/tx/5FvYaqzjHLbS4hzhYTWSc2be4W9wyL32SyZTaD5y1UMMAWahdCV2vZSQyMZtun4MpXDPFQ1oPSudpbXKy6Rk8uy8?cluster=devnet) |
+| `begin_transaction` | [5WZvMrUB2rVH...](https://explorer.solana.com/tx/5WZvMrUB2rVH4ndWhgc1oD5BtWW4WcCp7jh7qVrv2dpaDFLcWNkMr3efXpkajvYgTGFqopQFMtVUoEZvdqfF2WhV?cluster=devnet) |
+| `cast_vote` (Alice YES + hook) | [3kCorESY49Uw...](https://explorer.solana.com/tx/3kCorESY49UwhpNKydmVCWyVFknL9VZDyXUmic3257q9WqDux6V8vnLwovbeSyN13TBuJwVS2rLorSLSmpjSXK6V?cluster=devnet) |
+| `cast_vote` (Bob YES + hook) | [5cFUbAnb6Rdk...](https://explorer.solana.com/tx/5cFUbAnb6RdkimQb58uKgjqwNdJG2JCq8mzspnL89ZNwbqHZszhXbbhrtc54BLC1gyRvEC4acfEs9tPGSrZQYtuE?cluster=devnet) |
+| `commit` (fires CPI hooks) | [45pf6fWr6nHP...](https://explorer.solana.com/tx/45pf6fWr6nHPwVaxaQsFCnAnSjuowR1MCH2NhsLdancgLPNAMYrDejKFrKYfcQJxaJWgpWU6E2NoGYhptTpo2eo7?cluster=devnet) |
+| `close_transaction` | [3P3x8f7kFfEe...](https://explorer.solana.com/tx/3P3x8f7kFfEe6YUJPSvGCavXydQD3aWyEgC78gKz18L2bgGKAY26oRnQdfU6n82dtaQRzAEF7EFzYdw9akismGES?cluster=devnet) |
 
 ---
 
@@ -202,21 +205,34 @@ This makes the decision and its execution atomic. Neither program updates its st
 
 **Tradeoff:** if a hook program panics or returns an error, the entire `commit()` transaction fails and the transaction stays in COMMITTING. A participant could exploit this by registering a hook that always panics, permanently blocking `commit()`.
 
-The escape hatch is `commit_no_hooks`: any wallet can call it to finalize without executing any hooks. This defeats hook-griefing, but introduces a different tradeoff — there is no enforcement that `commit()` must be tried first. Any wallet may call `commit_no_hooks` immediately after all votes are cast, skipping hooks even when they are fully operational. Applications that require hooks to execute on every commit cannot rely on this as a hard guarantee in an adversarial environment. Hooks are best-effort, not atomic, when untrusted callers are present.
+The escape hatch is `commit_no_hooks`: any wallet can call it to finalize without executing any hooks. This defeats hook-griefing, but introduces a different tradeoff: there is no enforcement that `commit()` must be tried first. Any wallet may call `commit_no_hooks` immediately after all votes are cast, skipping hooks even when they are fully operational. Applications that require hooks to execute on every commit cannot rely on this as a hard guarantee in an adversarial environment. Hooks are best-effort, not atomic, when untrusted callers are present.
 
 ---
 
-## CLI
+## 2pc CLI
 
 ```bash
-./2pc begin <P1> <P2> --timeout 300
-./2pc vote <TX> yes --keypair ./alice.json
-./2pc vote <TX> yes --keypair ./bob.json --hook <HOOK_PROGRAM_ID>
-./2pc commit <TX>
-./2pc status <TX>
-./2pc abort <TX>
-./2pc timeout-abort <TX>
-./2pc close <TX>
+Usage: 2pc [options] [command]
+
+Two-Phase Commit CLI
+
+Options:
+  -V, --version                                     output the version number
+  -c, --cluster <name>                              localnet | devnet | testnet | mainnet-beta (default: "localnet")
+  -h, --help                                        display help for command
+
+Commands:
+  begin [options] <participants...>                 Start a new 2PC transaction
+  vote [options] <choice> [tx]                      Cast a vote (yes or no). tx defaults to TX in .2pc-env
+  commit [options] [tx]                             Finalize commit (permissionless). tx defaults to TX in .2pc-env
+  commit-no-hooks [options] [tx]                    Finalize commit without firing hooks (griefing fallback). tx defaults to TX in .2pc-env
+  abort [options] [tx]                              Finalize abort (permissionless). tx defaults to TX in .2pc-env
+  timeout-abort [options] [tx]                      Abort an expired transaction (permissionless). tx defaults to TX in .2pc-env
+  close [options] [tx]                              Close accounts and reclaim rent (coordinator only). tx defaults to TX in .2pc-env
+  status [options] [tx]                             Show current transaction state. tx defaults to TX in .2pc-env
+  init-hook [options] <participant> [hook_program]  Initialize hook state PDA for a participant
+  hook-status <participant> [hook_program]          Show hook state PDA for a participant. hook_program defaults to HOOK in .2pc-env
+  help [command]                                    display help for command
 ```
 
 ## Demo

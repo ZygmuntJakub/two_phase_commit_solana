@@ -75,23 +75,30 @@ async function buildHookAccounts(
   txAcc: PublicKey
 ): Promise<{ pubkey: PublicKey; isWritable: boolean; isSigner: boolean }[]> {
   const state = await program.account.transaction2Pc.fetch(txAcc);
+  const participantsRaw = readEnv()["PARTICIPANTS"] ?? "";
+  const participants = participantsRaw
+    .split(",")
+    .filter(Boolean)
+    .map((p) => new PublicKey(p));
   const remaining: {
     pubkey: PublicKey;
     isWritable: boolean;
     isSigner: boolean;
   }[] = [];
-  for (const hook of state.hooks) {
+  state.hooks.forEach((hook, idx) => {
     if (hook) {
+      const participant = participants[idx];
+      const programId = (hook as any).programId as PublicKey;
       const [statePda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("hook_state"), (hook as any).participant.toBuffer()],
-        (hook as any).programId
+        [Buffer.from("hook_state"), participant.toBuffer()],
+        programId
       );
       remaining.push(
-        { pubkey: (hook as any).programId, isWritable: false, isSigner: false },
+        { pubkey: programId, isWritable: false, isSigner: false },
         { pubkey: statePda, isWritable: true, isSigner: false }
       );
     }
-  }
+  });
   return remaining;
 }
 
@@ -204,6 +211,7 @@ cli
       .rpc();
 
     writeEnv("TX", txAcc.toBase58());
+    writeEnv("PARTICIPANTS", participants.map((p) => p.toBase58()).join(","));
     console.log(`\n✅ Transaction created`);
     console.log(`Signature  : ${sig}`);
     console.log(`TX account : ${txAcc.toBase58()}`);
@@ -213,7 +221,7 @@ cli
 
 cli
   .command("vote <choice> [tx]")
-  .description("Cast a vote (yes or no) — tx defaults to TX in .2pc-env")
+  .description("Cast a vote (yes or no). tx defaults to TX in .2pc-env")
   .option("-k, --keypair <path>", "participant keypair", DEFAULT_KEYPAIR)
   .option("-H, --hook <program_id>", "CPI hook program to call on finalization")
   .action(async (choice: string, txArg: string | undefined, opts) => {
@@ -233,9 +241,13 @@ cli
     console.log(`Vote        : ${choice.toUpperCase()}`);
     if (hookProgram) console.log(`Hook        : ${hookProgram.toBase58()}`);
 
+    const hookAccounts = hookProgram
+      ? [{ pubkey: hookProgram, isWritable: false, isSigner: false }]
+      : [];
     const sig = await (program.methods as any)
       .castVote(vote, hookProgram)
       .accounts({ participant: wallet.publicKey, transaction: txAcc })
+      .remainingAccounts(hookAccounts)
       .rpc();
 
     const state = await program.account.transaction2Pc.fetch(txAcc);
@@ -248,18 +260,18 @@ cli
 cli
   .command("commit [tx]")
   .description(
-    "Finalize commit (coordinator only) — tx defaults to TX in .2pc-env"
+    "Finalize commit (permissionless). tx defaults to TX in .2pc-env"
   )
-  .option("-k, --keypair <path>", "coordinator keypair", DEFAULT_KEYPAIR)
+  .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
   .action(async (txArg: string | undefined, opts) => {
     const cluster = cli.opts().cluster;
-    const { program, wallet } = setupProgram(opts.keypair, cluster);
+    const { program } = setupProgram(opts.keypair, cluster);
     const txAcc = new PublicKey(resolveArg(txArg, "TX", "transaction account"));
 
     const remainingAccounts = await buildHookAccounts(program, txAcc);
     const sig = await program.methods
       .commit()
-      .accounts({ coordinator: wallet.publicKey, transaction: txAcc } as any)
+      .accounts({ transaction: txAcc } as any)
       .remainingAccounts(remainingAccounts)
       .rpc();
 
@@ -268,10 +280,28 @@ cli
   });
 
 cli
-  .command("abort [tx]")
+  .command("commit-no-hooks [tx]")
   .description(
-    "Finalize abort (permissionless) — tx defaults to TX in .2pc-env"
+    "Finalize commit without firing hooks (griefing fallback). tx defaults to TX in .2pc-env"
   )
+  .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
+  .action(async (txArg: string | undefined, opts) => {
+    const cluster = cli.opts().cluster;
+    const { program } = setupProgram(opts.keypair, cluster);
+    const txAcc = new PublicKey(resolveArg(txArg, "TX", "transaction account"));
+
+    const sig = await program.methods
+      .commitNoHooks()
+      .accounts({ transaction: txAcc } as any)
+      .rpc();
+
+    console.log(`\n✅ COMMITTED (no hooks)`);
+    console.log(`Explorer : ${explorerUrl(sig, cluster)}`);
+  });
+
+cli
+  .command("abort [tx]")
+  .description("Finalize abort (permissionless). tx defaults to TX in .2pc-env")
   .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
   .action(async (txArg: string | undefined, opts) => {
     const cluster = cli.opts().cluster;
@@ -292,7 +322,7 @@ cli
 cli
   .command("timeout-abort [tx]")
   .description(
-    "Abort an expired transaction (permissionless) — tx defaults to TX in .2pc-env"
+    "Abort an expired transaction (permissionless). tx defaults to TX in .2pc-env"
   )
   .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
   .action(async (txArg: string | undefined, opts) => {
@@ -330,7 +360,7 @@ cli
 cli
   .command("close [tx]")
   .description(
-    "Close accounts and reclaim rent (coordinator only) — tx defaults to TX in .2pc-env"
+    "Close accounts and reclaim rent (coordinator only). tx defaults to TX in .2pc-env"
   )
   .option("-k, --keypair <path>", "coordinator keypair", DEFAULT_KEYPAIR)
   .action(async (txArg: string | undefined, opts) => {
@@ -349,7 +379,7 @@ cli
 
 cli
   .command("status [tx]")
-  .description("Show current transaction state — tx defaults to TX in .2pc-env")
+  .description("Show current transaction state. tx defaults to TX in .2pc-env")
   .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
   .action(async (txArg: string | undefined, opts) => {
     const cluster = cli.opts().cluster;
@@ -439,7 +469,7 @@ cli
 cli
   .command("hook-status <participant> [hook_program]")
   .description(
-    "Show hook state PDA for a participant — hook_program defaults to HOOK in .2pc-env"
+    "Show hook state PDA for a participant. hook_program defaults to HOOK in .2pc-env"
   )
   .action(
     async (participantArg: string, hookProgramArg: string | undefined) => {
