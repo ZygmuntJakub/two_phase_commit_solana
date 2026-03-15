@@ -18,7 +18,8 @@ const ENV_FILE = path.join(process.cwd(), ".2pc-env");
 function readEnv(): Record<string, string> {
   if (!fs.existsSync(ENV_FILE)) return {};
   return Object.fromEntries(
-    fs.readFileSync(ENV_FILE, "utf-8")
+    fs
+      .readFileSync(ENV_FILE, "utf-8")
       .split("\n")
       .filter(Boolean)
       .map((line) => line.split("=", 2) as [string, string])
@@ -28,13 +29,24 @@ function readEnv(): Record<string, string> {
 function writeEnv(key: string, value: string) {
   const env = readEnv();
   env[key] = value;
-  fs.writeFileSync(ENV_FILE, Object.entries(env).map(([k, v]) => `${k}=${v}`).join("\n") + "\n");
+  fs.writeFileSync(
+    ENV_FILE,
+    Object.entries(env)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("\n") + "\n"
+  );
 }
 
-function resolveArg(arg: string | undefined, envKey: string, label: string): string {
+function resolveArg(
+  arg: string | undefined,
+  envKey: string,
+  label: string
+): string {
   const value = arg ?? readEnv()[envKey];
   if (!value) {
-    console.error(`❌ Missing ${label}. Pass it as argument or run the appropriate command first.`);
+    console.error(
+      `❌ Missing ${label}. Pass it as argument or run the appropriate command first.`
+    );
     process.exit(1);
   }
   return value;
@@ -51,7 +63,8 @@ function clusterUrl(cluster: string): string {
 
 function explorerUrl(sig: string, cluster: string): string {
   const base = `https://explorer.solana.com/tx/${sig}`;
-  if (cluster === "localnet") return `${base}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`;
+  if (cluster === "localnet")
+    return `${base}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`;
   if (cluster === "devnet") return `${base}?cluster=devnet`;
   if (cluster === "testnet") return `${base}?cluster=testnet`;
   return base;
@@ -62,7 +75,11 @@ async function buildHookAccounts(
   txAcc: PublicKey
 ): Promise<{ pubkey: PublicKey; isWritable: boolean; isSigner: boolean }[]> {
   const state = await program.account.transaction2Pc.fetch(txAcc);
-  const remaining: { pubkey: PublicKey; isWritable: boolean; isSigner: boolean }[] = [];
+  const remaining: {
+    pubkey: PublicKey;
+    isWritable: boolean;
+    isSigner: boolean;
+  }[] = [];
   for (const hook of state.hooks) {
     if (hook) {
       const [statePda] = PublicKey.findProgramAddressSync(
@@ -80,7 +97,8 @@ async function buildHookAccounts(
 
 function explorerAddressUrl(address: string, cluster: string): string {
   const base = `https://explorer.solana.com/address/${address}`;
-  if (cluster === "localnet") return `${base}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`;
+  if (cluster === "localnet")
+    return `${base}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`;
   if (cluster === "devnet") return `${base}?cluster=devnet`;
   if (cluster === "testnet") return `${base}?cluster=testnet`;
   return base;
@@ -92,7 +110,10 @@ function loadKeypair(keyPath: string): Keypair {
   );
 }
 
-function setupProgram(keypairPath: string, cluster: string): {
+function setupProgram(
+  keypairPath: string,
+  cluster: string
+): {
   program: Program<TwoPhaseCommit>;
   wallet: Keypair;
 } {
@@ -145,13 +166,21 @@ const cli = new Command()
   .name("2pc")
   .description("Two-Phase Commit CLI")
   .version("1.0.0")
-  .option("-c, --cluster <name>", "localnet | devnet | testnet | mainnet-beta", DEFAULT_CLUSTER);
+  .option(
+    "-c, --cluster <name>",
+    "localnet | devnet | testnet | mainnet-beta",
+    DEFAULT_CLUSTER
+  );
 
 cli
   .command("begin <participants...>")
   .description("Start a new 2PC transaction")
   .option("-k, --keypair <path>", "coordinator keypair", DEFAULT_KEYPAIR)
-  .option("-t, --timeout <slots>", "slots before timeout", String(DEFAULT_TIMEOUT_SLOTS))
+  .option(
+    "-t, --timeout <slots>",
+    "slots before timeout",
+    String(DEFAULT_TIMEOUT_SLOTS)
+  )
   .option("-n, --nonce <n>", "custom nonce (default: timestamp)")
   .action(async (participantArgs: string[], opts) => {
     const cluster = cli.opts().cluster;
@@ -162,7 +191,9 @@ cli
 
     console.log(`\nCluster     : ${cluster}`);
     console.log(`Coordinator : ${wallet.publicKey.toBase58()}`);
-    console.log(`Participants: ${participants.map((p) => p.toBase58()).join(", ")}`);
+    console.log(
+      `Participants: ${participants.map((p) => p.toBase58()).join(", ")}`
+    );
     console.log(`Timeout     : ${opts.timeout} slots`);
     console.log(`Nonce       : ${nonce.toString()}`);
     console.log(`TX account  : ${txAcc.toBase58()}`);
@@ -216,7 +247,9 @@ cli
 
 cli
   .command("commit [tx]")
-  .description("Finalize commit (coordinator only) — tx defaults to TX in .2pc-env")
+  .description(
+    "Finalize commit (coordinator only) — tx defaults to TX in .2pc-env"
+  )
   .option("-k, --keypair <path>", "coordinator keypair", DEFAULT_KEYPAIR)
   .action(async (txArg: string | undefined, opts) => {
     const cluster = cli.opts().cluster;
@@ -236,7 +269,9 @@ cli
 
 cli
   .command("abort [tx]")
-  .description("Finalize abort (permissionless) — tx defaults to TX in .2pc-env")
+  .description(
+    "Finalize abort (permissionless) — tx defaults to TX in .2pc-env"
+  )
   .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
   .action(async (txArg: string | undefined, opts) => {
     const cluster = cli.opts().cluster;
@@ -256,7 +291,9 @@ cli
 
 cli
   .command("timeout-abort [tx]")
-  .description("Abort an expired transaction (permissionless) — tx defaults to TX in .2pc-env")
+  .description(
+    "Abort an expired transaction (permissionless) — tx defaults to TX in .2pc-env"
+  )
   .option("-k, --keypair <path>", "keypair", DEFAULT_KEYPAIR)
   .action(async (txArg: string | undefined, opts) => {
     const cluster = cli.opts().cluster;
@@ -274,7 +311,9 @@ cli
 
     if (!expired) {
       const wait = state.timeoutSlot.toNumber() - currentSlot + 1;
-      console.log(`\nNot expired yet. Wait ~${Math.ceil(wait * 0.4)}s (${wait} slots)`);
+      console.log(
+        `\nNot expired yet. Wait ~${Math.ceil(wait * 0.4)}s (${wait} slots)`
+      );
     }
 
     const remainingAccounts = await buildHookAccounts(program, txAcc);
@@ -290,7 +329,9 @@ cli
 
 cli
   .command("close [tx]")
-  .description("Close accounts and reclaim rent (coordinator only) — tx defaults to TX in .2pc-env")
+  .description(
+    "Close accounts and reclaim rent (coordinator only) — tx defaults to TX in .2pc-env"
+  )
   .option("-k, --keypair <path>", "coordinator keypair", DEFAULT_KEYPAIR)
   .action(async (txArg: string | undefined, opts) => {
     const cluster = cli.opts().cluster;
@@ -325,7 +366,11 @@ cli
     console.log(`  Account     : ${txAcc.toBase58()}`);
     console.log(`  Phase       : ${phaseName(state.phase)}`);
     console.log(`  Coordinator : ${state.coordinator.toBase58()}`);
-    console.log(`  Timeout     : ${state.timeoutSlot.toString()} (${slotsLeft > 0 ? `${slotsLeft} slots left` : "EXPIRED"})`);
+    console.log(
+      `  Timeout     : ${state.timeoutSlot.toString()} (${
+        slotsLeft > 0 ? `${slotsLeft} slots left` : "EXPIRED"
+      })`
+    );
     console.log(`  Yes votes   : ${state.yesCount}/${state.participantCount}`);
     console.log(`${"─".repeat(56)}`);
 
@@ -341,68 +386,99 @@ cli
   .command("init-hook <participant> [hook_program]")
   .description("Initialize hook state PDA for a participant")
   .option("-k, --keypair <path>", "payer keypair", DEFAULT_KEYPAIR)
-  .action(async (participantArg: string, hookProgramArg: string | undefined, opts) => {
-    const cluster = cli.opts().cluster;
-    const { wallet } = setupProgram(opts.keypair, cluster);
-    const participant = new PublicKey(participantArg);
-    const hookProgramId = new PublicKey(resolveArg(hookProgramArg, "HOOK", "hook program"));
+  .action(
+    async (
+      participantArg: string,
+      hookProgramArg: string | undefined,
+      opts
+    ) => {
+      const cluster = cli.opts().cluster;
+      const { wallet } = setupProgram(opts.keypair, cluster);
+      const participant = new PublicKey(participantArg);
+      const hookProgramId = new PublicKey(
+        resolveArg(hookProgramArg, "HOOK", "hook program")
+      );
 
-    const connection = new Connection(clusterUrl(cluster), "confirmed");
-    const provider = new anchor.AnchorProvider(connection, new anchor.Wallet(wallet), { commitment: "confirmed" });
-    anchor.setProvider(provider);
+      const connection = new Connection(clusterUrl(cluster), "confirmed");
+      const provider = new anchor.AnchorProvider(
+        connection,
+        new anchor.Wallet(wallet),
+        { commitment: "confirmed" }
+      );
+      anchor.setProvider(provider);
 
-    const idl = JSON.parse(fs.readFileSync(path.join(__dirname, "../target/idl/demo_participant.json"), "utf-8"));
-    const hookProgram = new Program<DemoParticipant>(idl, provider);
+      const idl = JSON.parse(
+        fs.readFileSync(
+          path.join(__dirname, "../target/idl/demo_participant.json"),
+          "utf-8"
+        )
+      );
+      const hookProgram = new Program<DemoParticipant>(idl, provider);
 
-    const [statePda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("hook_state"), participant.toBuffer()],
-      hookProgramId
-    );
+      const [statePda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("hook_state"), participant.toBuffer()],
+        hookProgramId
+      );
 
-    console.log(`\nParticipant : ${participant.toBase58()}`);
-    console.log(`Hook program: ${hookProgramId.toBase58()}`);
-    console.log(`State PDA   : ${statePda.toBase58()}`);
+      console.log(`\nParticipant : ${participant.toBase58()}`);
+      console.log(`Hook program: ${hookProgramId.toBase58()}`);
+      console.log(`State PDA   : ${statePda.toBase58()}`);
 
-    const sig = await hookProgram.methods
-      .initialize(participant)
-      .accounts({ payer: wallet.publicKey, state: statePda } as any)
-      .rpc();
+      const sig = await hookProgram.methods
+        .initialize(participant)
+        .accounts({ payer: wallet.publicKey, state: statePda } as any)
+        .rpc();
 
-    writeEnv("HOOK", hookProgramId.toBase58());
-    console.log(`\n✅ Hook state initialized`);
-    console.log(`Explorer : ${explorerUrl(sig, cluster)}`);
-    console.log(`\n💾 Saved HOOK to .2pc-env`);
-  });
+      writeEnv("HOOK", hookProgramId.toBase58());
+      console.log(`\n✅ Hook state initialized`);
+      console.log(`Explorer : ${explorerUrl(sig, cluster)}`);
+      console.log(`\n💾 Saved HOOK to .2pc-env`);
+    }
+  );
 
 cli
   .command("hook-status <participant> [hook_program]")
-  .description("Show hook state PDA for a participant — hook_program defaults to HOOK in .2pc-env")
-  .action(async (participantArg: string, hookProgramArg: string | undefined) => {
-    const cluster = cli.opts().cluster;
-    const { wallet } = setupProgram(DEFAULT_KEYPAIR, cluster);
-    const participant = new PublicKey(participantArg);
-    const hookProgramId = new PublicKey(resolveArg(hookProgramArg, "HOOK", "hook program"));
+  .description(
+    "Show hook state PDA for a participant — hook_program defaults to HOOK in .2pc-env"
+  )
+  .action(
+    async (participantArg: string, hookProgramArg: string | undefined) => {
+      const cluster = cli.opts().cluster;
+      const { wallet } = setupProgram(DEFAULT_KEYPAIR, cluster);
+      const participant = new PublicKey(participantArg);
+      const hookProgramId = new PublicKey(
+        resolveArg(hookProgramArg, "HOOK", "hook program")
+      );
 
-    const connection = new Connection(clusterUrl(cluster), "confirmed");
-    const provider = new anchor.AnchorProvider(connection, new anchor.Wallet(wallet), { commitment: "confirmed" });
-    anchor.setProvider(provider);
+      const connection = new Connection(clusterUrl(cluster), "confirmed");
+      const provider = new anchor.AnchorProvider(
+        connection,
+        new anchor.Wallet(wallet),
+        { commitment: "confirmed" }
+      );
+      anchor.setProvider(provider);
 
-    const idl = JSON.parse(fs.readFileSync(path.join(__dirname, "../target/idl/demo_participant.json"), "utf-8"));
-    const hookProgram = new Program<DemoParticipant>(idl, provider);
+      const idl = JSON.parse(
+        fs.readFileSync(
+          path.join(__dirname, "../target/idl/demo_participant.json"),
+          "utf-8"
+        )
+      );
+      const hookProgram = new Program<DemoParticipant>(idl, provider);
 
-    const [statePda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("hook_state"), participant.toBuffer()],
-      hookProgramId
-    );
+      const [statePda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("hook_state"), participant.toBuffer()],
+        hookProgramId
+      );
 
-    const state = await hookProgram.account.participantState.fetch(statePda);
+      const state = await hookProgram.account.participantState.fetch(statePda);
 
-    console.log(`\nParticipant : ${participant.toBase58()}`);
-    console.log(`State PDA   : ${statePda.toBase58()}`);
-    console.log(`Finalized   : ${state.finalized}`);
-    console.log(`Committed   : ${state.committed}`);
-  });
-
+      console.log(`\nParticipant : ${participant.toBase58()}`);
+      console.log(`State PDA   : ${statePda.toBase58()}`);
+      console.log(`Finalized   : ${state.finalized}`);
+      console.log(`Committed   : ${state.committed}`);
+    }
+  );
 
 cli.parseAsync(process.argv).catch((err) => {
   console.error("\n❌", err.message ?? err);

@@ -37,7 +37,7 @@ pub fn cast_vote(ctx: Context<CastVote>, vote: Vote, hook_program: Option<Pubkey
     }
 
     tx.votes[idx] = Some(vote);
-    tx.hooks[idx] = hook_program.map(|program_id| HookEntry { program_id, participant: participant_key });
+    tx.hooks[idx] = hook_program.map(|program_id| HookEntry { program_id });
 
     match vote {
         Vote::Yes => {

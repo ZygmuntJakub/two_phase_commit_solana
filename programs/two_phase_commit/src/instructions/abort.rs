@@ -16,8 +16,9 @@ pub fn abort<'info>(ctx: Context<'_, '_, '_, 'info, Abort<'info>>) -> Result<()>
     let tx_key = ctx.accounts.transaction.key();
     ctx.accounts.transaction.phase = Phase::Aborted;
     let hooks = ctx.accounts.transaction.hooks.clone();
+    let participants = ctx.accounts.transaction.pubkey_list()?;
     emit!(TransactionFinalized { transaction: tx_key, committed: false });
 
     let tx_info = ctx.accounts.transaction.to_account_info();
-    crate::hooks::fire_hooks(&hooks, "on_2pc_abort", tx_key, &tx_info, ctx.remaining_accounts)
+    crate::hooks::fire_hooks(&hooks, &participants, "on_2pc_abort", tx_key, &tx_info, ctx.remaining_accounts)
 }

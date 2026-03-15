@@ -5,7 +5,10 @@ import { DemoParticipant } from "../target/types/demo_participant";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import assert from "assert";
 
-function hookStatePda(participant: PublicKey, hookProgram: PublicKey): PublicKey {
+function hookStatePda(
+  participant: PublicKey,
+  hookProgram: PublicKey
+): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
     [Buffer.from("hook_state"), participant.toBuffer()],
     hookProgram
@@ -95,7 +98,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -134,7 +140,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -147,7 +156,10 @@ describe("two_phase_commit", () => {
     let state = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("aborting" in state.phase, "NO vote → Aborting");
 
-    await program.methods.abort().accounts({ transaction: txAcc } as any).rpc();
+    await program.methods
+      .abort()
+      .accounts({ transaction: txAcc } as any)
+      .rpc();
 
     state = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("aborted" in state.phase, "abort() → Aborted");
@@ -159,14 +171,20 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(1), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
     const state = await program.account.transaction2Pc.fetch(txAcc);
     await waitForSlot(provider.connection, state.timeoutSlot.toNumber());
 
-    await program.methods.timeoutAbort().accounts({ transaction: txAcc } as any).rpc();
+    await program.methods
+      .timeoutAbort()
+      .accounts({ transaction: txAcc } as any)
+      .rpc();
 
     const final = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("aborted" in final.phase, "expired Preparing → Aborted");
@@ -178,7 +196,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(1), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -193,7 +214,10 @@ describe("two_phase_commit", () => {
 
     await waitForSlot(provider.connection, state.timeoutSlot.toNumber());
 
-    await program.methods.timeoutAbort().accounts({ transaction: txAcc } as any).rpc();
+    await program.methods
+      .timeoutAbort()
+      .accounts({ transaction: txAcc } as any)
+      .rpc();
 
     const final = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("aborted" in final.phase, "expired Aborting → Aborted");
@@ -205,7 +229,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -227,7 +254,10 @@ describe("two_phase_commit", () => {
     // CannotTimeoutCommitting fires before NotYetExpired — no need to wait for expiry
     await expectError(
       () =>
-        program.methods.timeoutAbort().accounts({ transaction: txAcc } as any).rpc(),
+        program.methods
+          .timeoutAbort()
+          .accounts({ transaction: txAcc } as any)
+          .rpc(),
       "CannotTimeoutCommitting"
     );
   });
@@ -238,7 +268,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -246,7 +279,10 @@ describe("two_phase_commit", () => {
       () =>
         program.methods
           .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+          .accounts({
+            coordinator: coordinator.publicKey,
+            transaction: txAcc,
+          } as any)
           .signers([coordinator])
           .rpc(),
       "already in use"
@@ -259,7 +295,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -267,7 +306,10 @@ describe("two_phase_commit", () => {
       () =>
         program.methods
           .castVote({ yes: {} }, null)
-          .accounts({ participant: charlie.publicKey, transaction: txAcc } as any)
+          .accounts({
+            participant: charlie.publicKey,
+            transaction: txAcc,
+          } as any)
           .signers([charlie])
           .rpc(),
       "NotAParticipant"
@@ -280,7 +322,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -309,7 +354,10 @@ describe("two_phase_commit", () => {
       () =>
         program.methods
           .beginTransaction([alice.publicKey, bob.publicKey], new BN(0), n)
-          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+          .accounts({
+            coordinator: coordinator.publicKey,
+            transaction: txAcc,
+          } as any)
           .signers([coordinator])
           .rpc(),
       "InvalidTimeoutSlots"
@@ -322,7 +370,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(1), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -348,7 +399,10 @@ describe("two_phase_commit", () => {
       () =>
         program.methods
           .beginTransaction([alice.publicKey], new BN(100), n)
-          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+          .accounts({
+            coordinator: coordinator.publicKey,
+            transaction: txAcc,
+          } as any)
           .signers([coordinator])
           .rpc(),
       "TooFewParticipants"
@@ -367,7 +421,10 @@ describe("two_phase_commit", () => {
       () =>
         program.methods
           .beginTransaction(tooMany, new BN(100), n)
-          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+          .accounts({
+            coordinator: coordinator.publicKey,
+            transaction: txAcc,
+          } as any)
           .signers([coordinator])
           .rpc(),
       "TooManyParticipants"
@@ -382,7 +439,10 @@ describe("two_phase_commit", () => {
       () =>
         program.methods
           .beginTransaction([alice.publicKey, alice.publicKey], new BN(100), n)
-          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+          .accounts({
+            coordinator: coordinator.publicKey,
+            transaction: txAcc,
+          } as any)
           .signers([coordinator])
           .rpc(),
       "DuplicateParticipant"
@@ -395,7 +455,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -422,7 +485,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .closeTransaction()
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -444,7 +510,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -471,7 +540,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -492,7 +564,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n1)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc1 } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc1,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -512,7 +587,10 @@ describe("two_phase_commit", () => {
       () =>
         program.methods
           .closeTransaction()
-          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc1 } as any)
+          .accounts({
+            coordinator: coordinator.publicKey,
+            transaction: txAcc1,
+          } as any)
           .signers([coordinator])
           .rpc(),
       "NotTerminal"
@@ -524,7 +602,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n2)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc2 } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc2,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -538,7 +619,10 @@ describe("two_phase_commit", () => {
       () =>
         program.methods
           .closeTransaction()
-          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc2 } as any)
+          .accounts({
+            coordinator: coordinator.publicKey,
+            transaction: txAcc2,
+          } as any)
           .signers([coordinator])
           .rpc(),
       "NotTerminal"
@@ -552,13 +636,19 @@ describe("two_phase_commit", () => {
     // coordinator is also a participant
     await program.methods
       .beginTransaction([coordinator.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
     await program.methods
       .castVote({ yes: {} }, null)
-      .accounts({ participant: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        participant: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -577,7 +667,10 @@ describe("two_phase_commit", () => {
       .rpc();
 
     const final = await program.account.transaction2Pc.fetch(txAcc);
-    assert.ok("committed" in final.phase, "coordinator as participant can vote and commit");
+    assert.ok(
+      "committed" in final.phase,
+      "coordinator as participant can vote and commit"
+    );
   });
 
   it("commit: permissionless — non-coordinator can finalize in Committing phase", async () => {
@@ -586,7 +679,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -618,7 +714,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -656,7 +755,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -664,7 +766,10 @@ describe("two_phase_commit", () => {
       () =>
         program.methods
           .closeTransaction()
-          .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+          .accounts({
+            coordinator: coordinator.publicKey,
+            transaction: txAcc,
+          } as any)
           .signers([coordinator])
           .rpc(),
       "NotTerminal"
@@ -672,7 +777,10 @@ describe("two_phase_commit", () => {
   });
 
   async function airdrop(kp: Keypair) {
-    const sig = await provider.connection.requestAirdrop(kp.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
+    const sig = await provider.connection.requestAirdrop(
+      kp.publicKey,
+      10 * anchor.web3.LAMPORTS_PER_SOL
+    );
     await provider.connection.confirmTransaction(sig);
   }
 
@@ -684,8 +792,15 @@ describe("two_phase_commit", () => {
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
 
     await program.methods
-      .beginTransaction(participants.map((kp) => kp.publicKey), new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .beginTransaction(
+        participants.map((kp) => kp.publicKey),
+        new BN(100),
+        n
+      )
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -710,13 +825,40 @@ describe("two_phase_commit", () => {
     assert.ok("committed" in final.phase, "10 participants committed");
   });
 
+  it("timeout_abort: rejected before expiry (NotYetExpired)", async () => {
+    const n = nextNonce();
+    const txAcc = txPda(coordinator.publicKey, n, program.programId);
+
+    // Long timeout — won't expire during the test
+    await program.methods
+      .beginTransaction([alice.publicKey, bob.publicKey], new BN(1000), n)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
+      .signers([coordinator])
+      .rpc();
+
+    await expectError(
+      () =>
+        program.methods
+          .timeoutAbort()
+          .accounts({ transaction: txAcc } as any)
+          .rpc(),
+      "NotYetExpired"
+    );
+  });
+
   it("timeout_abort: rejected on COMMITTED state (InvalidPhase)", async () => {
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -743,7 +885,10 @@ describe("two_phase_commit", () => {
     // InvalidPhase fires before NotYetExpired — no need to wait for slot
     await expectError(
       () =>
-        program.methods.timeoutAbort().accounts({ transaction: txAcc } as any).rpc(),
+        program.methods
+          .timeoutAbort()
+          .accounts({ transaction: txAcc } as any)
+          .rpc(),
       "InvalidPhase"
     );
   });
@@ -754,7 +899,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -779,7 +927,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -804,7 +955,10 @@ describe("two_phase_commit", () => {
 
     await program.methods
       .beginTransaction([alice.publicKey, bob.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
       .signers([coordinator])
       .rpc();
 
@@ -826,38 +980,57 @@ describe("two_phase_commit", () => {
   });
 
   it("CPI hooks: on_2pc_commit fires on all participants when commit() called", async () => {
-    const p1 = Keypair.generate(); const p2 = Keypair.generate();
+    const p1 = Keypair.generate();
+    const p2 = Keypair.generate();
     await Promise.all([airdrop(p1), airdrop(p2)]);
     const p1Pda = hookStatePda(p1.publicKey, demoProgram.programId);
     const p2Pda = hookStatePda(p2.publicKey, demoProgram.programId);
 
-    await demoProgram.methods.initialize(p1.publicKey)
+    await demoProgram.methods
+      .initialize(p1.publicKey)
       .accounts({ payer: coordinator.publicKey, state: p1Pda } as any)
-      .signers([coordinator]).rpc();
-    await demoProgram.methods.initialize(p2.publicKey)
+      .signers([coordinator])
+      .rpc();
+    await demoProgram.methods
+      .initialize(p2.publicKey)
       .accounts({ payer: coordinator.publicKey, state: p2Pda } as any)
-      .signers([coordinator]).rpc();
+      .signers([coordinator])
+      .rpc();
 
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
 
-    await program.methods.beginTransaction([p1.publicKey, p2.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
-      .signers([coordinator]).rpc();
+    await program.methods
+      .beginTransaction([p1.publicKey, p2.publicKey], new BN(100), n)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
+      .signers([coordinator])
+      .rpc();
 
-    await program.methods.castVote({ yes: {} }, demoProgram.programId)
+    await program.methods
+      .castVote({ yes: {} }, demoProgram.programId)
       .accounts({ participant: p1.publicKey, transaction: txAcc } as any)
-      .remainingAccounts([{ pubkey: demoProgram.programId, isWritable: false, isSigner: false }])
-      .signers([p1]).rpc();
-    await program.methods.castVote({ yes: {} }, demoProgram.programId)
+      .remainingAccounts([
+        { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+      ])
+      .signers([p1])
+      .rpc();
+    await program.methods
+      .castVote({ yes: {} }, demoProgram.programId)
       .accounts({ participant: p2.publicKey, transaction: txAcc } as any)
-      .remainingAccounts([{ pubkey: demoProgram.programId, isWritable: false, isSigner: false }])
-      .signers([p2]).rpc();
+      .remainingAccounts([
+        { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+      ])
+      .signers([p2])
+      .rpc();
 
     const state = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("committing" in state.phase);
 
-    await program.methods.commit()
+    await program.methods
+      .commit()
       .accounts({ transaction: txAcc } as any)
       .remainingAccounts([
         { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
@@ -874,31 +1047,44 @@ describe("two_phase_commit", () => {
   });
 
   it("CPI hooks: on_2pc_abort fires when timeout_abort() called", async () => {
-    const p1 = Keypair.generate(); const p2 = Keypair.generate();
+    const p1 = Keypair.generate();
+    const p2 = Keypair.generate();
     await Promise.all([airdrop(p1), airdrop(p2)]);
     const p1Pda = hookStatePda(p1.publicKey, demoProgram.programId);
 
-    await demoProgram.methods.initialize(p1.publicKey)
+    await demoProgram.methods
+      .initialize(p1.publicKey)
       .accounts({ payer: coordinator.publicKey, state: p1Pda } as any)
-      .signers([coordinator]).rpc();
+      .signers([coordinator])
+      .rpc();
 
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
 
-    await program.methods.beginTransaction([p1.publicKey, p2.publicKey], new BN(1), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
-      .signers([coordinator]).rpc();
+    await program.methods
+      .beginTransaction([p1.publicKey, p2.publicKey], new BN(1), n)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
+      .signers([coordinator])
+      .rpc();
 
-    await program.methods.castVote({ yes: {} }, demoProgram.programId)
+    await program.methods
+      .castVote({ yes: {} }, demoProgram.programId)
       .accounts({ participant: p1.publicKey, transaction: txAcc } as any)
-      .remainingAccounts([{ pubkey: demoProgram.programId, isWritable: false, isSigner: false }])
-      .signers([p1]).rpc();
+      .remainingAccounts([
+        { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+      ])
+      .signers([p1])
+      .rpc();
 
     const state = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("preparing" in state.phase);
     await waitForSlot(provider.connection, state.timeoutSlot.toNumber());
 
-    await program.methods.timeoutAbort()
+    await program.methods
+      .timeoutAbort()
       .accounts({ transaction: txAcc } as any)
       .remainingAccounts([
         { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
@@ -911,29 +1097,45 @@ describe("two_phase_commit", () => {
   });
 
   it("CPI hooks: MissingHookAccount when remaining_accounts not provided", async () => {
-    const p1 = Keypair.generate(); const p2 = Keypair.generate();
+    const p1 = Keypair.generate();
+    const p2 = Keypair.generate();
     await Promise.all([airdrop(p1), airdrop(p2)]);
 
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
 
-    await program.methods.beginTransaction([p1.publicKey, p2.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
-      .signers([coordinator]).rpc();
+    await program.methods
+      .beginTransaction([p1.publicKey, p2.publicKey], new BN(100), n)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
+      .signers([coordinator])
+      .rpc();
 
-    await program.methods.castVote({ yes: {} }, demoProgram.programId)
+    await program.methods
+      .castVote({ yes: {} }, demoProgram.programId)
       .accounts({ participant: p1.publicKey, transaction: txAcc } as any)
-      .remainingAccounts([{ pubkey: demoProgram.programId, isWritable: false, isSigner: false }])
-      .signers([p1]).rpc();
-    await program.methods.castVote({ yes: {} }, demoProgram.programId)
+      .remainingAccounts([
+        { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+      ])
+      .signers([p1])
+      .rpc();
+    await program.methods
+      .castVote({ yes: {} }, demoProgram.programId)
       .accounts({ participant: p2.publicKey, transaction: txAcc } as any)
-      .remainingAccounts([{ pubkey: demoProgram.programId, isWritable: false, isSigner: false }])
-      .signers([p2]).rpc();
+      .remainingAccounts([
+        { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+      ])
+      .signers([p2])
+      .rpc();
 
     await expectError(
-      () => program.methods.commit()
-        .accounts({ transaction: txAcc } as any)
-        .rpc(),
+      () =>
+        program.methods
+          .commit()
+          .accounts({ transaction: txAcc } as any)
+          .rpc(),
       "MissingHookAccount"
     );
   });
@@ -941,47 +1143,73 @@ describe("two_phase_commit", () => {
   it("CPI hooks: hook failure rolls back commit(); commit_no_hooks() recovers", async () => {
     // p1 initializes hook state; p2 does NOT → commit() fails on p2's hook.
     // commit_no_hooks() bypasses hooks and finalizes successfully.
-    const p1 = Keypair.generate(); const p2 = Keypair.generate();
+    const p1 = Keypair.generate();
+    const p2 = Keypair.generate();
     await Promise.all([airdrop(p1), airdrop(p2)]);
     const p1Pda = hookStatePda(p1.publicKey, demoProgram.programId);
     const p2Pda = hookStatePda(p2.publicKey, demoProgram.programId);
 
     // Only p1 sets up its hook state
-    await demoProgram.methods.initialize(p1.publicKey)
+    await demoProgram.methods
+      .initialize(p1.publicKey)
       .accounts({ payer: coordinator.publicKey, state: p1Pda } as any)
-      .signers([coordinator]).rpc();
+      .signers([coordinator])
+      .rpc();
     // p2Pda intentionally NOT initialized
 
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
 
-    await program.methods.beginTransaction([p1.publicKey, p2.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
-      .signers([coordinator]).rpc();
+    await program.methods
+      .beginTransaction([p1.publicKey, p2.publicKey], new BN(100), n)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
+      .signers([coordinator])
+      .rpc();
 
-    await program.methods.castVote({ yes: {} }, demoProgram.programId)
+    await program.methods
+      .castVote({ yes: {} }, demoProgram.programId)
       .accounts({ participant: p1.publicKey, transaction: txAcc } as any)
-      .remainingAccounts([{ pubkey: demoProgram.programId, isWritable: false, isSigner: false }])
-      .signers([p1]).rpc();
-    await program.methods.castVote({ yes: {} }, demoProgram.programId)
+      .remainingAccounts([
+        { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+      ])
+      .signers([p1])
+      .rpc();
+    await program.methods
+      .castVote({ yes: {} }, demoProgram.programId)
       .accounts({ participant: p2.publicKey, transaction: txAcc } as any)
-      .remainingAccounts([{ pubkey: demoProgram.programId, isWritable: false, isSigner: false }])
-      .signers([p2]).rpc();
+      .remainingAccounts([
+        { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+      ])
+      .signers([p2])
+      .rpc();
 
     const beforeCommit = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("committing" in beforeCommit.phase);
 
     // commit() fails — p2's hook state PDA is uninitialized
     await expectError(
-      () => program.methods.commit()
-        .accounts({ transaction: txAcc } as any)
-        .remainingAccounts([
-          { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
-          { pubkey: p1Pda, isWritable: true, isSigner: false },
-          { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
-          { pubkey: p2Pda, isWritable: true, isSigner: false },
-        ])
-        .rpc(),
+      () =>
+        program.methods
+          .commit()
+          .accounts({ transaction: txAcc } as any)
+          .remainingAccounts([
+            {
+              pubkey: demoProgram.programId,
+              isWritable: false,
+              isSigner: false,
+            },
+            { pubkey: p1Pda, isWritable: true, isSigner: false },
+            {
+              pubkey: demoProgram.programId,
+              isWritable: false,
+              isSigner: false,
+            },
+            { pubkey: p2Pda, isWritable: true, isSigner: false },
+          ])
+          .rpc(),
       "AccountNotInitialized"
     );
 
@@ -990,48 +1218,71 @@ describe("two_phase_commit", () => {
     assert.ok("committing" in afterFail.phase, "tx rolled back to Committing");
 
     // commit_no_hooks() bypasses hooks and finalizes — hook griefing is defeated
-    await program.methods.commitNoHooks()
+    await program.methods
+      .commitNoHooks()
       .accounts({ transaction: txAcc } as any)
       .rpc();
 
     const afterFallback = await program.account.transaction2Pc.fetch(txAcc);
-    assert.ok("committed" in afterFallback.phase, "commit_no_hooks() recovered from hook griefing");
+    assert.ok(
+      "committed" in afterFallback.phase,
+      "commit_no_hooks() recovered from hook griefing"
+    );
   });
 
   it("CPI hooks: on_2pc_abort fires when abort() called", async () => {
-    const p1 = Keypair.generate(); const p2 = Keypair.generate();
+    const p1 = Keypair.generate();
+    const p2 = Keypair.generate();
     await Promise.all([airdrop(p1), airdrop(p2)]);
     const p1Pda = hookStatePda(p1.publicKey, demoProgram.programId);
     const p2Pda = hookStatePda(p2.publicKey, demoProgram.programId);
 
-    await demoProgram.methods.initialize(p1.publicKey)
+    await demoProgram.methods
+      .initialize(p1.publicKey)
       .accounts({ payer: coordinator.publicKey, state: p1Pda } as any)
-      .signers([coordinator]).rpc();
-    await demoProgram.methods.initialize(p2.publicKey)
+      .signers([coordinator])
+      .rpc();
+    await demoProgram.methods
+      .initialize(p2.publicKey)
       .accounts({ payer: coordinator.publicKey, state: p2Pda } as any)
-      .signers([coordinator]).rpc();
+      .signers([coordinator])
+      .rpc();
 
     const n = nextNonce();
     const txAcc = txPda(coordinator.publicKey, n, program.programId);
 
-    await program.methods.beginTransaction([p1.publicKey, p2.publicKey], new BN(100), n)
-      .accounts({ coordinator: coordinator.publicKey, transaction: txAcc } as any)
-      .signers([coordinator]).rpc();
+    await program.methods
+      .beginTransaction([p1.publicKey, p2.publicKey], new BN(100), n)
+      .accounts({
+        coordinator: coordinator.publicKey,
+        transaction: txAcc,
+      } as any)
+      .signers([coordinator])
+      .rpc();
 
     // p2 votes YES first (phase stays Preparing), then p1 votes NO
-    await program.methods.castVote({ yes: {} }, demoProgram.programId)
+    await program.methods
+      .castVote({ yes: {} }, demoProgram.programId)
       .accounts({ participant: p2.publicKey, transaction: txAcc } as any)
-      .remainingAccounts([{ pubkey: demoProgram.programId, isWritable: false, isSigner: false }])
-      .signers([p2]).rpc();
-    await program.methods.castVote({ no: {} }, demoProgram.programId)
+      .remainingAccounts([
+        { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+      ])
+      .signers([p2])
+      .rpc();
+    await program.methods
+      .castVote({ no: {} }, demoProgram.programId)
       .accounts({ participant: p1.publicKey, transaction: txAcc } as any)
-      .remainingAccounts([{ pubkey: demoProgram.programId, isWritable: false, isSigner: false }])
-      .signers([p1]).rpc();
+      .remainingAccounts([
+        { pubkey: demoProgram.programId, isWritable: false, isSigner: false },
+      ])
+      .signers([p1])
+      .rpc();
 
     const state = await program.account.transaction2Pc.fetch(txAcc);
     assert.ok("aborting" in state.phase);
 
-    await program.methods.abort()
+    await program.methods
+      .abort()
       .accounts({ transaction: txAcc } as any)
       .remainingAccounts([
         { pubkey: demoProgram.programId, isWritable: false, isSigner: false },

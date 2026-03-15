@@ -11,6 +11,7 @@ use crate::state::HookEntry;
 /// state_account must be the PDA: ["hook_state", participant] under hook program
 pub fn fire_hooks<'info>(
     hooks: &[Option<HookEntry>],
+    participants: &[Pubkey],
     instruction_name: &str,
     tx_key: Pubkey,
     tx_info: &AccountInfo<'info>,
@@ -19,7 +20,10 @@ pub fn fire_hooks<'info>(
     let discriminator = ix_discriminator(instruction_name);
     let mut iter = remaining_accounts.iter();
 
-    for entry in hooks.iter().flatten() {
+    for (idx, entry) in hooks.iter().enumerate() {
+        let Some(entry) = entry else { continue };
+        let participant = participants[idx];
+
         let program_info = iter
             .next()
             .ok_or(error!(crate::error::ErrorCode::MissingHookAccount))?;
@@ -28,7 +32,7 @@ pub fn fire_hooks<'info>(
             .ok_or(error!(crate::error::ErrorCode::MissingHookAccount))?;
 
         let mut data = discriminator.to_vec();
-        data.extend_from_slice(entry.participant.as_ref());
+        data.extend_from_slice(participant.as_ref());
 
         let ix = Instruction {
             program_id: entry.program_id,
